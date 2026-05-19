@@ -38,7 +38,14 @@ export const itemService = {
     name: string,
     quantity: string = '1',
     unit?: string,
-    targetMemberIds: string[] = []
+    targetMemberIds: string[] = [],
+    extras: {
+      category?: string,
+      priority?: 'low' | 'medium' | 'high',
+      notes?: string,
+      estimated_price?: number,
+      store?: string
+    } = {}
   ) {
     const sanitizedName = sanitizeTextInput(name)
     const sanitizedQuantity = sanitizeTextInput(quantity)
@@ -54,6 +61,7 @@ export const itemService = {
         quantity: sanitizedQuantity,
         unit,
         target_member_ids: targetMemberIds,
+        ...extras
       })
       .select(`
         *,
@@ -124,8 +132,8 @@ export const itemService = {
   async createChangeRequest(
     itemId: string,
     userId: string,
-    oldQuantity: string,
-    newQuantity: string,
+    oldData: any,
+    newData: any,
     reason?: string
   ) {
     const { data: existingRequest, error: existingRequestError } = await supabase
@@ -138,7 +146,7 @@ export const itemService = {
     if (existingRequestError) throw existingRequestError
 
     if (existingRequest) {
-      throw new Error('There is already a pending quantity request for this item')
+      throw new Error('There is already a pending request for this item')
     }
 
     const { data, error } = await supabase
@@ -146,8 +154,11 @@ export const itemService = {
       .insert({
         item_id: itemId,
         requested_by: userId,
-        old_quantity: sanitizeTextInput(oldQuantity),
-        new_quantity: sanitizeTextInput(newQuantity),
+        old_data: oldData,
+        new_data: newData,
+        // Keep these for backward compatibility with RLS/Constraints if any
+        old_quantity: oldData.quantity || '0',
+        new_quantity: newData.quantity || '0',
         reason: reason ? sanitizeTextInput(reason) : null,
       })
       .select()

@@ -36,9 +36,29 @@ export type ShoppingItem = {
   unit: string | null
   added_by: string
   target_member_ids: string[]
+  category: string | null
+  priority: 'low' | 'medium' | 'high'
+  notes: string | null
+  estimated_price: number | null
+  store: string | null
   status: 'active' | 'purchased' | 'archived' | 'discussion_pending'
   created_at: string
   updated_at: string
+}
+
+export type ItemChangeRequest = {
+  id: string
+  item_id: string
+  requested_by: string
+  old_quantity: string | null
+  new_quantity: string
+  old_data: any
+  new_data: any
+  reason: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  resolved_by: string | null
+  resolved_at: string | null
 }
 
 export type ItemChangeRequestVote = {

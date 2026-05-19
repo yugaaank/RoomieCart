@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { Container, YStack, XStack, Text, Button, Card } from '../components/ui'
-import { Check, X, ArrowRight, Clock3 } from '@tamagui/lucide-icons'
+import { Check, X, ArrowRight, Clock3, AlertCircle } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PendingRequests'>
 
@@ -81,7 +81,7 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
       if (updatedRequest.status === 'pending') {
         Alert.alert('Vote Submitted', `You voted ${vote.toUpperCase()}. Waiting on the other roommates.`)
       } else if (updatedRequest.status === 'approved') {
-        Alert.alert('Approved', 'All roommates voted YES. The quantity change has been applied.')
+        Alert.alert('Approved', 'All roommates voted YES. The changes have been applied.')
       } else if (updatedRequest.status === 'rejected') {
         Alert.alert('Rejected', 'At least one roommate voted NO. The negotiation has failed.')
       }
@@ -95,76 +95,86 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
   const handleCancel = async (requestId: string) => {
     try {
       await itemService.cancelChangeRequest(requestId)
-      Alert.alert('Cancelled', 'Your quantity change request has been cancelled.')
+      Alert.alert('Cancelled', 'Your request has been cancelled.')
       fetchRequests()
     } catch (err: any) {
       Alert.alert('Error', err.message)
     }
   }
 
+  const renderChangeItem = (label: string, oldVal: any, newVal: any) => {
+    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return null
+
+    const displayOld = Array.isArray(oldVal) ? `${oldVal.length} members` : (oldVal || 'None')
+    const displayNew = Array.isArray(newVal) ? `${newVal.length} members` : (newVal || 'None')
+
+    return (
+      <YStack key={label} gap="$1" paddingVertical="$2" borderBottomWidth={1} borderColor="$borderColor">
+        <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">{label.toUpperCase()}</Text>
+        <XStack ai="center" gap="$2" flexWrap="wrap">
+          <Text fontSize={14} color="$red10" textDecorationLine="line-through">{displayOld}</Text>
+          <ArrowRight size={12} color="$colorSubtitle" />
+          <Text fontSize={14} color="$green10" fontWeight="bold">{displayNew}</Text>
+        </XStack>
+      </YStack>
+    )
+  }
+
   const renderRequest = ({ item }: { item: any }) => {
     const votes = item.item_change_request_votes || []
     const yesVotes = votes.filter((vote: any) => vote.vote === 'yes').length
     const noVotes = votes.filter((vote: any) => vote.vote === 'no').length
-    const targetMemberIds = item.shopping_items?.target_member_ids || []
+    
+    // Use new_data if available, otherwise fallback to legacy quantity fields
+    const newData = item.new_data || { quantity: item.new_quantity }
+    const oldData = item.old_data || { quantity: item.old_quantity || item.shopping_items?.quantity }
+    
+    const targetMemberIds = newData.target_member_ids || item.shopping_items?.target_member_ids || []
+    
     const eligibleMembers = members.filter((member: any) => {
-      if (member.user_id === item.requested_by) {
-        return false
-      }
-
-      if (targetMemberIds.length === 0) {
-        return true
-      }
-
-      return targetMemberIds.includes(member.user_id)
+      if (member.user_id === item.requested_by) return false
+      return true // For now, all room members vote on all changes
     })
+
     const eligibleVoterCount = eligibleMembers.length
     const currentUserVote = votes.find((vote: any) => vote.voter_id === user?.id)
     const isRequester = item.requested_by === user?.id
     const isResolved = item.status !== 'pending'
+    
     const voteByUserId = new Map(votes.map((vote: any) => [vote.voter_id, vote.vote]))
     const pendingMembers = eligibleMembers.filter((member: any) => !voteByUserId.has(member.user_id))
     const yesVoters = eligibleMembers.filter((member: any) => voteByUserId.get(member.user_id) === 'yes')
     const noVoters = eligibleMembers.filter((member: any) => voteByUserId.get(member.user_id) === 'no')
-    const appliesToLabel =
-      targetMemberIds.length === 0
-        ? 'Everyone'
-        : members
-            .filter((member: any) => targetMemberIds.includes(member.user_id))
-            .map((member: any) => member.profiles?.name || 'Unknown')
-            .join(', ')
 
     return (
       <Card elevation="$2" borderWidth={1} borderColor="$borderColor" padding="$4" marginBottom="$3">
         <YStack gap="$3">
           <XStack jc="space-between" ai="center">
-            <Text fontWeight="bold" fontSize={16}>{item.shopping_items?.name}</Text>
-            <Text color="$colorSubtitle" fontSize={12}>by {item.profiles?.name || 'Someone'}</Text>
+            <YStack>
+              <Text fontWeight="bold" fontSize={16}>{oldData.name || item.shopping_items?.name}</Text>
+              <Text color="$colorSubtitle" fontSize={12}>Requested by {item.profiles?.name || 'Someone'}</Text>
+            </YStack>
+            <YStack bc="$yellow4" px="$2" py="$1" br="$2">
+              <Text fontSize={10} fontWeight="bold" color="$yellow10">NEGOTIATION</Text>
+            </YStack>
           </XStack>
 
           <YStack bc="$backgroundStrong" p="$3" br="$4">
-            <XStack ai="center" jc="center" gap="$3">
-              <Text color="$colorSubtitle">
-                {item.old_quantity || item.shopping_items?.quantity || '?'} {item.shopping_items?.unit || ''}
-              </Text>
-              <ArrowRight size={16} color="$colorSubtitle" />
-              <Text fontWeight="bold" fontSize={18} color="$blue10">
-                {item.new_quantity} {item.shopping_items?.unit || ''}
-              </Text>
-            </XStack>
+            <Text fontSize={13} fontWeight="bold" mb="$2">PROPOSED CHANGES:</Text>
+            {renderChangeItem('Name', oldData.name, newData.name)}
+            {renderChangeItem('Quantity', oldData.quantity, newData.quantity)}
+            {renderChangeItem('Unit', oldData.unit, newData.unit)}
+            {renderChangeItem('Target Members', oldData.target_member_ids, newData.target_member_ids)}
           </YStack>
 
           <YStack gap="$2">
-            <Text color="$colorSubtitle" fontSize={12}>
-              Applies to: {appliesToLabel}
-            </Text>
             <XStack ai="center" gap="$2">
               <Check size={14} color="$green10" />
               <Text color="$colorSubtitle">Yes: {yesVotes}/{eligibleVoterCount}</Text>
             </XStack>
             {yesVoters.length > 0 && (
               <Text color="$colorSubtitle" fontSize={12}>
-                Yes by: {yesVoters.map((member: any) => member.profiles?.name || 'Unknown').join(', ')}
+                Voted Yes: {yesVoters.map((m: any) => m.profiles?.name || 'User').join(', ')}
               </Text>
             )}
             <XStack ai="center" gap="$2">
@@ -173,53 +183,39 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
             </XStack>
             {noVoters.length > 0 && (
               <Text color="$colorSubtitle" fontSize={12}>
-                No by: {noVoters.map((member: any) => member.profiles?.name || 'Unknown').join(', ')}
-              </Text>
-            )}
-            <XStack ai="center" gap="$2">
-              <Clock3 size={14} color="$yellow10" />
-              <Text color="$colorSubtitle">
-                Change applies only if every eligible roommate votes YES.
-              </Text>
-            </XStack>
-            {pendingMembers.length > 0 && (
-              <Text color="$colorSubtitle" fontSize={12}>
-                Waiting on: {pendingMembers.map((member: any) => member.profiles?.name || 'Unknown').join(', ')}
+                Voted No: {noVoters.map((m: any) => m.profiles?.name || 'User').join(', ')}
               </Text>
             )}
           </YStack>
 
           {item.reason && (
-            <Text fontSize={14} color="$colorSubtitle" fontStyle="italic">
-              {item.reason}
-            </Text>
+            <YStack bc="$backgroundTransparent" p="$3" br="$4" borderLeftWidth={4} borderColor="$blue8">
+              <Text fontSize={14} fontStyle="italic">"{item.reason}"</Text>
+            </YStack>
           )}
 
-          <Text color="$colorSubtitle" fontSize={12}>
-            Requested {new Date(item.created_at).toLocaleString()}
-          </Text>
+          <XStack ai="center" gap="$2">
+            <Clock3 size={14} color="$colorSubtitle" />
+            <Text color="$colorSubtitle" fontSize={11}>
+              Requested {new Date(item.created_at).toLocaleString()}
+            </Text>
+          </XStack>
 
           {isRequester ? (
-            <YStack gap="$2">
-              <Text color="$colorSubtitle">
-                Waiting for roommates to vote.
-              </Text>
-              <Button
-                theme="red"
-                variant="outlined"
-                onPress={() => handleCancel(item.id)}
-              >
-                Cancel Request
-              </Button>
-            </YStack>
+            <Button
+              theme="red"
+              variant="outlined"
+              size="$3"
+              onPress={() => handleCancel(item.id)}
+            >
+              Cancel Request
+            </Button>
           ) : currentUserVote ? (
-            <Text color="$colorSubtitle">
-              You voted {currentUserVote.vote.toUpperCase()}.
-            </Text>
+            <XStack ai="center" jc="center" p="$2" bc="$backgroundStrong" br="$4">
+              <Text fontWeight="bold">You voted: {currentUserVote.vote.toUpperCase()}</Text>
+            </XStack>
           ) : isResolved ? (
-            <Text color="$colorSubtitle">
-              This request has already been resolved.
-            </Text>
+            <Text textAlign="center" color="$colorSubtitle">Resolved</Text>
           ) : (
             <XStack gap="$3">
               <Button
@@ -228,7 +224,7 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
                 icon={X}
                 onPress={() => handleResolve(item.id, 'no')}
               >
-                Vote No
+                Reject
               </Button>
               <Button
                 f={1}
@@ -236,7 +232,7 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
                 icon={Check}
                 onPress={() => handleResolve(item.id, 'yes')}
               >
-                Vote Yes
+                Approve
               </Button>
             </XStack>
           )}
@@ -253,11 +249,12 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
         renderItem={renderRequest}
         onRefresh={fetchRequests}
         refreshing={loading}
+        contentContainerStyle={{ padding: 16 }}
         ListEmptyComponent={
           <YStack ai="center" jc="center" padding="$10" gap="$4">
-            <Check size={48} color="$green10" opacity={0.5} />
+            <AlertCircle size={48} color="$colorSubtitle" opacity={0.5} />
             <Text textAlign="center" color="$colorSubtitle">
-              No pending quantity requests. All roommates are in agreement!
+              No pending change requests in this room.
             </Text>
           </YStack>
         }

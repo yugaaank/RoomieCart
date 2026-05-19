@@ -10,7 +10,7 @@ import { useRealtimeItems } from '../hooks/useRealtimeItems'
 import RequestChangeModal from '../components/RequestChangeModal'
 import { supabase } from '../lib/supabase'
 import { Container, YStack, XStack, Text, Button, Input, Card } from '../components/ui'
-import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle, Settings } from '@tamagui/lucide-icons'
+import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle, Settings, ChevronDown, ChevronUp, Tag, DollarSign, Info, MapPin } from '@tamagui/lucide-icons'
 import {
   MAX_ITEM_NAME_LENGTH,
   MAX_QUANTITY_VALUE,
@@ -21,6 +21,8 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
 
 const UNITS = ['pcs', 'kg', 'g', 'L', 'ml', 'pack', 'box', 'other']
+const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Frozen', 'Pantry', 'Cleaning', 'Personal Care', 'Other']
+const PRIORITIES = ['low', 'medium', 'high']
 
 export default function RoomDetailsScreen({ route, navigation }: Props) {
   const { roomId, roomName } = route.params
@@ -28,10 +30,19 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   
   const [items, setItems] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
+  
+  // Basic Form
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('1')
   const [selectedUnit, setSelectedUnit] = useState('pcs')
   const [selectedTargetMemberIds, setSelectedTargetMemberIds] = useState<string[]>([])
+  
+  const [category, setCategory] = useState('')
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [notes, setNotes] = useState('')
+  const [estimatedPrice, setEstimatedPrice] = useState('')
+  const [store, setStore] = useState('')
+
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [pendingRequestCount, setPendingRequestCount] = useState(0)
@@ -117,14 +128,10 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   const handleAddItem = async () => {
     const sanitizedItemName = sanitizeTextInput(newItemName)
     const sanitizedQuantity = sanitizeTextInput(newItemQuantity)
+    const priceNum = estimatedPrice ? parseFloat(estimatedPrice) : undefined
 
     if (!sanitizedItemName) {
       setAddItemError('Enter an item name.')
-      return
-    }
-
-    if (sanitizedItemName.length > MAX_ITEM_NAME_LENGTH) {
-      setAddItemError(`Item name must be ${MAX_ITEM_NAME_LENGTH} characters or fewer.`)
       return
     }
 
@@ -141,7 +148,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         const requestedQty = parseFloat(sanitizedQuantity) || 1
         Alert.alert(
           'Duplicate Item',
-          `"${existing.name}" is already on the list with quantity ${existing.quantity}.`,
+          `"${existing.name}" is already on the list.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Add Anyway', onPress: () => performAddItem() },
@@ -180,12 +187,26 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         sanitizeTextInput(newItemName),
         sanitizeTextInput(newItemQuantity),
         selectedUnit,
-        selectedTargetMemberIds
+        selectedTargetMemberIds,
+        {
+          category: category || undefined,
+          priority: priority,
+          notes: notes.trim() || undefined,
+          estimated_price: estimatedPrice ? parseFloat(estimatedPrice) : undefined,
+          store: store.trim() || undefined
+        }
       )
       setItems((currentItems) => [newItem, ...currentItems])
+      
+      // Reset Form
       setNewItemName('')
       setNewItemQuantity('1')
       setSelectedTargetMemberIds([])
+      setCategory('')
+      setPriority('medium')
+      setNotes('')
+      setEstimatedPrice('')
+      setStore('')
       setAddItemError(null)
     } catch (err: any) {
       Alert.alert('Error', err.message)
@@ -209,7 +230,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       .filter((member) => item.target_member_ids.includes(member.user_id))
       .map((member) => member.profiles?.name?.split(' ')[0] || 'User')
 
-    return selectedNames.length > 0 ? selectedNames.join(', ') : 'Selected roommates'
+    return selectedNames.length > 0 ? selectedNames.join(', ') : 'Selected'
   }
 
   const toggleStatus = async (item: ShoppingItem) => {
@@ -242,73 +263,106 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       'Actions',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Request Qty Change', onPress: () => setIsModalVisible(true) },
+        { text: 'Propose Changes', onPress: () => setIsModalVisible(true) },
         { text: 'Delete Item', style: 'destructive', onPress: () => deleteItem(item.id) }
       ]
     )
   }
 
-  const renderItem = ({ item }: { item: any }) => (
-    <Card 
-      elevation={item.status === 'active' ? '$2' : '$0'}
-      borderWidth={1}
-      borderColor="$borderColor"
-      backgroundColor={item.status === 'purchased' ? '$backgroundTransparent' : '$background'}
-      padding="$4" 
-      marginBottom="$2"
-      onPress={() => toggleStatus(item)}
-      onLongPress={() => handleLongPress(item)}
-      opacity={item.status === 'purchased' ? 0.6 : 1}
-    >
-      <XStack jc="space-between" ai="center">
-        <XStack gap="$3" ai="center" flex={1}>
-          <YStack 
-            width={24} 
-            height={24} 
-            borderRadius={12} 
-            borderWidth={1} 
-            borderColor={item.status === 'purchased' ? '$green10' : '$colorSubtitle'}
-            ai="center" 
-            jc="center"
-            backgroundColor={item.status === 'purchased' ? '$green10' : 'transparent'}
-          >
-            {item.status === 'purchased' && <Check size={14} color="white" />}
-          </YStack>
-          
-          <YStack flex={1}>
-            <Text 
-              fontSize={16} 
-              fontWeight="500"
-              textDecorationLine={item.status === 'purchased' ? 'line-through' : 'none'}
+  const renderItem = ({ item }: { item: ShoppingItem | any }) => {
+    const priorityColor = item.priority === 'high' ? '$red10' : item.priority === 'low' ? '$blue10' : '$colorSubtitle'
+    
+    return (
+      <Card 
+        elevation={item.status === 'active' ? '$2' : '$0'}
+        borderWidth={1}
+        borderColor="$borderColor"
+        backgroundColor={item.status === 'purchased' ? '$backgroundTransparent' : '$background'}
+        padding="$4" 
+        marginBottom="$2"
+        onPress={() => toggleStatus(item)}
+        onLongPress={() => handleLongPress(item)}
+        opacity={item.status === 'purchased' ? 0.6 : 1}
+      >
+        <XStack jc="space-between" ai="flex-start">
+          <XStack gap="$3" ai="flex-start" flex={1}>
+            <YStack 
+              width={24} 
+              height={24} 
+              borderRadius={12} 
+              borderWidth={1} 
+              borderColor={item.status === 'purchased' ? '$green10' : '$colorSubtitle'}
+              ai="center" 
+              jc="center"
+              marginTop="$1"
+              backgroundColor={item.status === 'purchased' ? '$green10' : 'transparent'}
             >
-              {item.name}
-            </Text>
-            <YStack gap="$1">
-              <XStack ai="center" gap="$1">
-                <Text fontSize={14} color="$colorSubtitle">
-                  Qty: {item.quantity} {item.unit || ''}
+              {item.status === 'purchased' && <Check size={14} color="white" />}
+            </YStack>
+            
+            <YStack flex={1} gap="$1">
+              <XStack ai="center" gap="$2">
+                <Text 
+                  fontSize={16} 
+                  fontWeight="bold"
+                  textDecorationLine={item.status === 'purchased' ? 'line-through' : 'none'}
+                >
+                  {item.name}
                 </Text>
-                {item.status === 'discussion_pending' && (
-                  <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2">
-                    <AlertCircle size={12} color="$yellow10" />
-                    <Text fontSize={12} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
+                {(item.priority && item.priority !== 'medium') && (
+                  <Text fontSize={10} fontWeight="bold" color={priorityColor}>
+                    [{item.priority.toUpperCase()}]
+                  </Text>
+                )}
+              </XStack>
+
+              <XStack gap="$2" flexWrap="wrap">
+                <Text fontSize={14} color="$colorSubtitle">
+                  {item.quantity} {item.unit || ''}
+                </Text>
+                {item.category && (
+                  <XStack ai="center" gap="$1" bc="$backgroundStrong" px="$2" br="$2">
+                    <Tag size={10} color="$colorSubtitle" />
+                    <Text fontSize={11} color="$colorSubtitle">{item.category}</Text>
+                  </XStack>
+                )}
+                {item.store && (
+                  <XStack ai="center" gap="$1" bc="$backgroundStrong" px="$2" br="$2">
+                    <MapPin size={10} color="$colorSubtitle" />
+                    <Text fontSize={11} color="$colorSubtitle">{item.store}</Text>
+                  </XStack>
+                )}
+                {item.estimated_price && (
+                  <XStack ai="center" gap="$1" bc="$green2" px="$2" br="$2">
+                    <DollarSign size={10} color="$green10" />
+                    <Text fontSize={11} color="$green10">${item.estimated_price}</Text>
                   </XStack>
                 )}
               </XStack>
-              <Text fontSize={11} color="$colorSubtitle">
-                Added by {item.profiles?.name || 'Someone'} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              <Text fontSize={11} color="$colorSubtitle">
-                For: {getTargetMemberLabel(item)}
-              </Text>
+
+              {item.notes && (
+                <XStack ai="flex-start" gap="$1">
+                  <Info size={12} color="$colorSubtitle" marginTop="$1" />
+                  <Text fontSize={12} fontStyle="italic" color="$colorSubtitle" flex={1}>
+                    {item.notes}
+                  </Text>
+                </XStack>
+              )}
+
+              <YStack gap="$1" marginTop="$1">
+                {item.status === 'discussion_pending' && (
+                  <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2" alignSelf="flex-start">
+                    <AlertCircle size={12} color="$yellow10" />
+                    <Text fontSize={10} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
+                  </XStack>
+                )}
+                <Text fontSize={10} color="$colorSubtitle">
+                  Added by {item.profiles?.name || 'Someone'} • For: {getTargetMemberLabel(item)}
+                </Text>
+              </YStack>
             </YStack>
-          </YStack>
-        </XStack>
-        
-        <XStack gap="$2">
-          {item.status === 'discussion_pending' && (
-            <Button size="$2" circular icon={MessageSquare} chromeless />
-          )}
+          </XStack>
+          
           <Button 
             size="$2" 
             circular 
@@ -318,124 +372,158 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             onPress={() => deleteItem(item.id)} 
           />
         </XStack>
-      </XStack>
-    </Card>
-  )
+      </Card>
+    )
+  }
 
   return (
     <Container padding="$0">
       <YStack padding="$4" backgroundColor="$backgroundStrong" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
-        <XStack gap="$2" ai="center" paddingBottom="$2">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <XStack gap="$2">
-              {members.map((m) => (
-                <XStack 
-                  key={m.id} 
-                  ai="center" 
-                  gap="$1" 
-                  bc="$background" 
-                  px="$2" 
-                  py="$1" 
-                  br="$10" 
-                  borderWidth={1} 
-                  borderColor="$borderColor"
-                >
-                  <YStack bc="$blue5" w={16} h={16} br={8} ai="center" jc="center">
-                    <Text fontSize={8} color="white" fontWeight="bold">
-                      {(m.profiles?.name || 'U').charAt(0).toUpperCase()}
-                    </Text>
-                  </YStack>
-                  <Text fontSize={12} fontWeight={m.user_id === user?.id ? "bold" : "400"}>
-                    {m.profiles?.name?.split(' ')[0] || 'User'}
-                  </Text>
-                  {m.role === 'owner' && <Text fontSize={8}>👑</Text>}
-                </XStack>
-              ))}
-            </XStack>
-          </ScrollView>
-        </XStack>
+        {/* Required Section */}
+        <YStack gap="$3">
+          <XStack gap="$3">
+            <Input
+              flex={1}
+              placeholder="Item name..."
+              value={newItemName}
+              onChangeText={setNewItemName}
+              size="$4"
+              maxLength={MAX_ITEM_NAME_LENGTH}
+            />
+            <Input
+              width={70}
+              placeholder="Qty"
+              value={newItemQuantity}
+              onChangeText={setNewItemQuantity}
+              keyboardType="numeric"
+              size="$4"
+            />
+            <Button 
+              theme="active" 
+              icon={Plus} 
+              onPress={handleAddItem}
+              size="$4"
+            />
+          </XStack>
 
-        <XStack gap="$3">
-          <Input
-            flex={1}
-            placeholder="Add to list..."
-            value={newItemName}
-            onChangeText={(value) => {
-              setNewItemName(value)
-              if (addItemError) {
-                setAddItemError(null)
-              }
-            }}
-            size="$4"
-            maxLength={MAX_ITEM_NAME_LENGTH}
-          />
-          <Input
-            width={96}
-            placeholder="Qty"
-            value={newItemQuantity}
-            onChangeText={(value) => {
-              setNewItemQuantity(value)
-              if (addItemError) {
-                setAddItemError(null)
-              }
-            }}
-            keyboardType="numeric"
-            size="$4"
-          />
-          <Button 
-            theme="active" 
-            icon={Plus} 
-            onPress={handleAddItem}
-            size="$4"
-          />
-        </XStack>
+          <YStack gap="$2">
+            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">UNIT</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$1">
+                {UNITS.map(u => (
+                  <Button 
+                    key={u} 
+                    size="$2" 
+                    backgroundColor={selectedUnit === u ? '$blue9' : '$background'}
+                    color={selectedUnit === u ? 'white' : '$color'}
+                    onPress={() => setSelectedUnit(u)}
+                    borderWidth={1}
+                    borderColor={selectedUnit === u ? '$blue9' : '$borderColor'}
+                  >
+                    {u}
+                  </Button>
+                ))}
+              </XStack>
+            </ScrollView>
+          </YStack>
+
+          <YStack gap="$2">
+            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">WHO IS THIS FOR?</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$1">
+                <Button 
+                  size="$2" 
+                  backgroundColor={selectedTargetMemberIds.length === 0 ? '$blue9' : '$background'}
+                  color={selectedTargetMemberIds.length === 0 ? 'white' : '$color'}
+                  onPress={() => setSelectedTargetMemberIds([])}
+                  borderWidth={1}
+                  borderColor={selectedTargetMemberIds.length === 0 ? '$blue9' : '$borderColor'}
+                >
+                  Everyone
+                </Button>
+                {members.map(m => (
+                  <Button 
+                    key={m.user_id} 
+                    size="$2" 
+                    backgroundColor={selectedTargetMemberIds.includes(m.user_id) ? '$blue9' : '$background'}
+                    color={selectedTargetMemberIds.includes(m.user_id) ? 'white' : '$color'}
+                    onPress={() => toggleTargetMember(m.user_id)}
+                    borderWidth={1}
+                    borderColor={selectedTargetMemberIds.includes(m.user_id) ? '$blue9' : '$borderColor'}
+                  >
+                    {m.profiles?.name?.split(' ')[0]}
+                  </Button>
+                ))}
+              </XStack>
+            </ScrollView>
+          </YStack>
+        </YStack>
+
+        <YStack borderTopWidth={1} borderColor="$borderColor" paddingTop="$3" gap="$3">
+          <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">EXTRA DETAILS (OPTIONAL)</Text>
+          
+          <YStack gap="$2">
+            <Text fontSize={11} fontWeight="bold">CATEGORY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$1">
+                {CATEGORIES.map(c => (
+                  <Button 
+                    key={c} 
+                    size="$2" 
+                    backgroundColor={category === c ? '$blue10' : '$background'}
+                    color={category === c ? 'white' : '$color'}
+                    onPress={() => setCategory(c)}
+                    borderWidth={1}
+                    borderColor={category === c ? '$blue10' : '$borderColor'}
+                  >
+                    {c}
+                  </Button>
+                ))}
+              </XStack>
+            </ScrollView>
+          </YStack>
+
+          <XStack gap="$3">
+            <YStack f={1} gap="$1">
+              <Text fontSize={11} fontWeight="bold">PRIORITY</Text>
+              <XStack gap="$1">
+                {PRIORITIES.map(p => (
+                  <Button 
+                    key={p} 
+                    f={1} 
+                    size="$2" 
+                    backgroundColor={priority === p ? '$blue10' : '$background'}
+                    color={priority === p ? 'white' : '$color'}
+                    onPress={() => setPriority(p as any)}
+                    borderWidth={1}
+                    borderColor={priority === p ? '$blue10' : '$borderColor'}
+                  >
+                    {p.charAt(0).toUpperCase()}
+                  </Button>
+                ))}
+              </XStack>
+            </YStack>
+            <YStack f={1} gap="$1">
+              <Text fontSize={11} fontWeight="bold">EST. PRICE</Text>
+              <Input size="$3" value={estimatedPrice} onChangeText={setEstimatedPrice} keyboardType="numeric" placeholder="$0.00" />
+            </YStack>
+            <YStack f={1} gap="$1">
+              <Text fontSize={11} fontWeight="bold">STORE</Text>
+              <Input size="$3" value={store} onChangeText={setStore} placeholder="Costco..." />
+            </YStack>
+          </XStack>
+
+          <YStack gap="$1">
+            <Text fontSize={11} fontWeight="bold">NOTES</Text>
+            <Input size="$3" value={notes} onChangeText={setNotes} placeholder="Brand, size, etc." />
+          </YStack>
+        </YStack>
+
         {addItemError && (
-          <Text color="$red10" fontSize={13}>
+          <Text color="$red10" fontSize={12} marginTop="$1">
             {addItemError}
           </Text>
         )}
-        
-        <XStack gap="$2" flexWrap="wrap">
-          {UNITS.map(unit => (
-            <Button 
-              key={unit}
-              size="$2"
-              theme={selectedUnit === unit ? 'active' : undefined}
-              onPress={() => setSelectedUnit(unit)}
-              variant={selectedUnit === unit ? undefined : 'outlined'}
-            >
-              {unit}
-            </Button>
-          ))}
-        </XStack>
-
-        <YStack gap="$2">
-          <Text fontWeight="bold">Who is this for?</Text>
-          <XStack gap="$2" flexWrap="wrap">
-            <Button
-              size="$2"
-              theme={selectedTargetMemberIds.length === 0 ? 'active' : undefined}
-              variant={selectedTargetMemberIds.length === 0 ? undefined : 'outlined'}
-              onPress={() => setSelectedTargetMemberIds([])}
-            >
-              Everyone
-            </Button>
-            {members.map((member) => (
-              <Button
-                key={member.user_id}
-                size="$2"
-                theme={selectedTargetMemberIds.includes(member.user_id) ? 'active' : undefined}
-                variant={selectedTargetMemberIds.includes(member.user_id) ? undefined : 'outlined'}
-                onPress={() => toggleTargetMember(member.user_id)}
-              >
-                {member.profiles?.name?.split(' ')[0] || 'User'}
-              </Button>
-            ))}
-          </XStack>
-          <Text fontSize={12} color="$colorSubtitle">
-            Leave it on Everyone, or select one or more roommates for this item.
-          </Text>
-        </YStack>
       </YStack>
 
       <FlatList
@@ -449,7 +537,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
           <YStack ai="center" jc="center" padding="$10" gap="$4">
             <ShoppingCart size={48} color="$colorSubtitle" opacity={0.5} />
             <Text textAlign="center" color="$colorSubtitle">
-              Your shopping list is empty. Add something above!
+              Your shopping list is empty.
             </Text>
           </YStack>
         }
@@ -459,6 +547,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         visible={isModalVisible}
         item={selectedItem}
         userId={user!.id}
+        roomMembers={members}
         onClose={() => setIsModalVisible(false)}
         onSuccess={() => {
           fetchItems()
