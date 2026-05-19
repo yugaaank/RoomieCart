@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { ShoppingItem } from '../types/database.types'
+import { sanitizeTextInput } from '../lib/validation'
 
 function sortItemsWithPurchasedLast(items: any[]) {
   return [...items].sort((a, b) => {
@@ -31,18 +32,28 @@ export const itemService = {
     return sortItemsWithPurchasedLast(data as any[])
   },
 
-  async addItem(roomId: string, userId: string, name: string, quantity: string = '1', unit?: string) {
-    const normalizedName = name.trim().toLowerCase()
+  async addItem(
+    roomId: string,
+    userId: string,
+    name: string,
+    quantity: string = '1',
+    unit?: string,
+    targetMemberIds: string[] = []
+  ) {
+    const sanitizedName = sanitizeTextInput(name)
+    const sanitizedQuantity = sanitizeTextInput(quantity)
+    const normalizedName = sanitizedName.toLowerCase()
     
     const { data, error } = await supabase
       .from('shopping_items')
       .insert({
         room_id: roomId,
         added_by: userId,
-        name: name.trim(),
+        name: sanitizedName,
         normalized_name: normalizedName,
-        quantity,
+        quantity: sanitizedQuantity,
         unit,
+        target_member_ids: targetMemberIds,
       })
       .select(`
         *,
@@ -57,10 +68,12 @@ export const itemService = {
   },
 
   async mergeItemQuantity(itemId: string, newQuantity: string) {
+    const sanitizedQuantity = sanitizeTextInput(newQuantity)
+
     const { data, error } = await supabase
       .from('shopping_items')
       .update({ 
-        quantity: newQuantity,
+        quantity: sanitizedQuantity,
         updated_at: new Date().toISOString()
       })
       .eq('id', itemId)
@@ -95,7 +108,7 @@ export const itemService = {
   },
 
   async searchDuplicate(roomId: string, name: string) {
-    const normalizedName = name.trim().toLowerCase()
+    const normalizedName = sanitizeTextInput(name).toLowerCase()
     const { data, error } = await supabase
       .from('shopping_items')
       .select('*')
@@ -133,9 +146,9 @@ export const itemService = {
       .insert({
         item_id: itemId,
         requested_by: userId,
-        old_quantity: oldQuantity,
-        new_quantity: newQuantity,
-        reason,
+        old_quantity: sanitizeTextInput(oldQuantity),
+        new_quantity: sanitizeTextInput(newQuantity),
+        reason: reason ? sanitizeTextInput(reason) : null,
       })
       .select()
       .single()
@@ -155,6 +168,7 @@ export const itemService = {
           name,
           quantity,
           unit,
+          target_member_ids,
           status
         ),
         profiles:requested_by(name),
@@ -178,6 +192,15 @@ export const itemService = {
     const { data, error } = await supabase.rpc('submit_change_request_vote', {
       request_id_param: requestId,
       vote_param: vote,
+    })
+
+    if (error) throw error
+    return data
+  },
+
+  async cancelChangeRequest(requestId: string) {
+    const { data, error } = await supabase.rpc('cancel_change_request', {
+      request_id_param: requestId,
     })
 
     if (error) throw error

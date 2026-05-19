@@ -7,6 +7,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { Container, YStack, Text, Input, Button, Card, XStack } from '../components/ui'
 import { Save, User as UserIcon, Mail } from '@tamagui/lucide-icons'
+import { MAX_PROFILE_NAME_LENGTH, sanitizeTextInput } from '../lib/validation'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>
 
@@ -15,6 +16,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -34,14 +36,23 @@ export default function ProfileScreen({ navigation }: Props) {
   }
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Name cannot be empty')
+    const sanitizedName = sanitizeTextInput(name)
+
+    if (!sanitizedName) {
+      setError('Name cannot be empty.')
       return
     }
 
+    if (sanitizedName.length > MAX_PROFILE_NAME_LENGTH) {
+      setError(`Name must be ${MAX_PROFILE_NAME_LENGTH} characters or fewer.`)
+      return
+    }
+
+    setError(null)
+
     setSaving(true)
     try {
-      await profileService.updateProfile(user!.id, { name: name.trim() })
+      await profileService.updateProfile(user!.id, { name: sanitizedName })
       Alert.alert('Success', 'Profile updated successfully')
     } catch (err: any) {
       Alert.alert('Error', 'Could not update profile')
@@ -71,10 +82,21 @@ export default function ProfileScreen({ navigation }: Props) {
               <Input
                 style={{ marginLeft: 24 }}
                 value={name}
-                onChangeText={setName}
+                onChangeText={(value) => {
+                  setName(value)
+                  if (error) {
+                    setError(null)
+                  }
+                }}
                 placeholder="Your Name"
                 size="$4"
+                maxLength={MAX_PROFILE_NAME_LENGTH}
               />
+              {error && (
+                <Text color="$red10" fontSize={13} paddingLeft="$6">
+                  {error}
+                </Text>
+              )}
             </YStack>
           </YStack>
         </Card>

@@ -6,22 +6,33 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { Container, YStack, Text, Input, Button } from '../components/ui'
 import { Users } from '@tamagui/lucide-icons'
+import { sanitizeTextInput } from '../lib/validation'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JoinRoom'>
 
 export default function JoinRoomScreen({ navigation }: Props) {
   const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const user = useAuthStore((state) => state.user)
   const { joinRoom, loading } = useRoomStore()
 
   const handleJoin = async () => {
-    if (!code.trim()) {
-      Alert.alert('Please enter an invite code')
+    const sanitizedCode = sanitizeTextInput(code).toUpperCase()
+
+    if (!sanitizedCode) {
+      setError('Please enter an invite code.')
       return
     }
 
+    if (!/^[A-Z0-9]{6}$/.test(sanitizedCode)) {
+      setError('Invite code must be 6 letters or numbers.')
+      return
+    }
+
+    setError(null)
+
     try {
-      await joinRoom(code.trim().toUpperCase(), user!.id)
+      await joinRoom(sanitizedCode, user!.id)
       Alert.alert('Success', 'Joined room successfully')
       navigation.goBack()
     } catch (err: any) {
@@ -37,10 +48,21 @@ export default function JoinRoomScreen({ navigation }: Props) {
           <Input
             placeholder="ENTER-CODE"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(value) => {
+              setCode(value)
+              if (error) {
+                setError(null)
+              }
+            }}
             autoCapitalize="characters"
             size="$4"
+            maxLength={6}
           />
+          {error && (
+            <Text color="$red10" fontSize={13}>
+              {error}
+            </Text>
+          )}
           <Text fontSize={14} color="$colorSubtitle">
             Ask the room owner for their 6-digit invite code.
           </Text>

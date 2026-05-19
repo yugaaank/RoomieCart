@@ -4,6 +4,7 @@ import { itemService } from '../services/itemService'
 import { ShoppingItem } from '../types/database.types'
 import { YStack, XStack, Text, Button, Input, Card } from './ui'
 import { AlertTriangle, Send, X } from '@tamagui/lucide-icons'
+import { MAX_QUANTITY_VALUE, MIN_REASON_LENGTH, isValidQuantityValue, sanitizeTextInput } from '../lib/validation'
 
 interface Props {
   visible: boolean
@@ -17,19 +18,30 @@ export default function RequestChangeModal({ visible, item, userId, onClose, onS
   const [newQuantity, setNewQuantity] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   if (!item) return null
 
   const handleSubmit = async () => {
-    if (!newQuantity.trim()) {
-      Alert.alert('Error', 'Please enter a new quantity')
+    const sanitizedQuantity = sanitizeTextInput(newQuantity)
+    const sanitizedReason = sanitizeTextInput(reason)
+
+    if (!isValidQuantityValue(sanitizedQuantity)) {
+      setFormError(`Quantity must be a number between 0 and ${MAX_QUANTITY_VALUE}.`)
       return
     }
 
-    if (newQuantity.trim() === item.quantity) {
-      Alert.alert('Error', 'Enter a different quantity to create a request')
+    if (sanitizedQuantity === item.quantity) {
+      setFormError('Enter a different quantity to create a request.')
       return
     }
+
+    if (sanitizedReason.length < MIN_REASON_LENGTH) {
+      setFormError(`Please provide a reason with at least ${MIN_REASON_LENGTH} characters.`)
+      return
+    }
+
+    setFormError(null)
 
     setLoading(true)
     try {
@@ -37,14 +49,15 @@ export default function RequestChangeModal({ visible, item, userId, onClose, onS
         item.id,
         userId,
         item.quantity,
-        newQuantity.trim(),
-        reason.trim()
+        sanitizedQuantity,
+        sanitizedReason
       )
       await itemService.updateItemStatus(item.id, 'discussion_pending')
       
       Alert.alert('Request Sent', 'Your roommates will be notified of the quantity change request.')
       setNewQuantity('')
       setReason('')
+      setFormError(null)
       onSuccess()
       onClose()
     } catch (err: any) {
@@ -77,17 +90,28 @@ export default function RequestChangeModal({ visible, item, userId, onClose, onS
               <Input
                 placeholder="e.g. 2kg, 5 units"
                 value={newQuantity}
-                onChangeText={setNewQuantity}
+                onChangeText={(value) => {
+                  setNewQuantity(value)
+                  if (formError) {
+                    setFormError(null)
+                  }
+                }}
+                keyboardType="numeric"
                 size="$4"
               />
             </YStack>
 
             <YStack gap="$1">
-              <Text fontWeight="bold">Reason (Optional)</Text>
+              <Text fontWeight="bold">Reason</Text>
               <Input
-                placeholder="Why the change?"
+                placeholder="Explain why this change is needed"
                 value={reason}
-                onChangeText={setReason}
+                onChangeText={(value) => {
+                  setReason(value)
+                  if (formError) {
+                    setFormError(null)
+                  }
+                }}
                 size="$4"
                 height={80}
                 multiline
@@ -95,6 +119,12 @@ export default function RequestChangeModal({ visible, item, userId, onClose, onS
               />
             </YStack>
           </YStack>
+
+          {formError && (
+            <Text color="$red10" fontSize={13}>
+              {formError}
+            </Text>
+          )}
 
           <XStack gap="$3">
             <Button f={1} chromeless onPress={onClose}>Cancel</Button>

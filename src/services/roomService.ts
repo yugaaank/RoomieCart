@@ -1,15 +1,17 @@
 import { supabase } from '../lib/supabase'
-import { Room, RoomMember } from '../types/database.types'
+import { Room } from '../types/database.types'
+import { sanitizeTextInput } from '../lib/validation'
 
 export const roomService = {
   async createRoom(name: string, ownerId: string) {
+    const sanitizedName = sanitizeTextInput(name)
     const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
     
     // 1. Create the room
     const { data: room, error: roomError } = await supabase
       .from('rooms')
       .insert({
-        name,
+        name: sanitizedName,
         invite_code: inviteCode,
         owner_id: ownerId,
       })
@@ -93,6 +95,7 @@ export const roomService = {
         )
       `)
       .eq('room_id', roomId)
+      .eq('status', 'active')
 
     if (error) throw error
     return data
@@ -126,5 +129,15 @@ export const roomService = {
       .eq('id', roomId)
 
     if (error) throw error
+  },
+
+  async removeMember(roomId: string, memberUserId: string) {
+    const { data, error } = await supabase.rpc('remove_room_member', {
+      room_id_param: roomId,
+      member_user_id_param: memberUserId,
+    })
+
+    if (error) throw error
+    return data
   }
 }

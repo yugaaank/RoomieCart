@@ -8,8 +8,15 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { useRealtimeItems } from '../hooks/useRealtimeItems'
 import RequestChangeModal from '../components/RequestChangeModal'
+import { supabase } from '../lib/supabase'
 import { Container, YStack, XStack, Text, Button, Input, Card } from '../components/ui'
 import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle, Settings } from '@tamagui/lucide-icons'
+import {
+  MAX_ITEM_NAME_LENGTH,
+  MAX_QUANTITY_VALUE,
+  isValidQuantityValue,
+  sanitizeTextInput,
+} from '../lib/validation'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
 
@@ -24,20 +31,25 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('1')
   const [selectedUnit, setSelectedUnit] = useState('pcs')
+  const [selectedTargetMemberIds, setSelectedTargetMemberIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [pendingRequestCount, setPendingRequestCount] = useState(0)
+  const [addItemError, setAddItemError] = useState<string | null>(null)
 
   const [selectedItem, setSelectedItem] = useState<ShoppingItem | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
 
   const fetchItems = useCallback(async () => {
     try {
-      const [itemsData, membersData] = await Promise.all([
+      const [itemsData, membersData, pendingRequests] = await Promise.all([
         itemService.getRoomItems(roomId),
-        roomService.getRoomMembers(roomId)
+        roomService.getRoomMembers(roomId),
+        itemService.getPendingRequests(roomId),
       ])
       setItems(itemsData)
       setMembers(membersData)
+      setPendingRequestCount(pendingRequests.length)
     } catch (err: any) {
       Alert.alert('Error fetching room data', err.message)
     } finally {
@@ -57,7 +69,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             theme="active" 
             onPress={() => navigation.navigate('PendingRequests', { roomId })}
           >
-            Requests
+            {pendingRequestCount > 0 ? `Requests (${pendingRequestCount})` : 'Requests'}
           </Button>
           <Button 
             size="$2" 
@@ -68,7 +80,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         </XStack>
       )
     })
-  }, [navigation, roomName, roomId])
+  }, [navigation, roomName, roomId, pendingRequestCount])
 
   useEffect(() => {
     fetchItems()
@@ -76,22 +88,57 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   useRealtimeItems(roomId, fetchItems)
 
+  useEffect(() => {
+    const requestChannel = supabase
+      .channel(`room-request-count-${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'item_change_requests',
+        },
+        () => {
+          fetchItems()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(requestChannel)
+    }
+  }, [fetchItems, roomId])
+
   const onRefresh = () => {
     setRefreshing(true)
     fetchItems()
   }
 
   const handleAddItem = async () => {
-    if (!newItemName.trim()) return
-    if (!newItemQuantity.trim()) {
-      Alert.alert('Error', 'Please enter a quantity')
+    const sanitizedItemName = sanitizeTextInput(newItemName)
+    const sanitizedQuantity = sanitizeTextInput(newItemQuantity)
+
+    if (!sanitizedItemName) {
+      setAddItemError('Enter an item name.')
       return
     }
 
+    if (sanitizedItemName.length > MAX_ITEM_NAME_LENGTH) {
+      setAddItemError(`Item name must be ${MAX_ITEM_NAME_LENGTH} characters or fewer.`)
+      return
+    }
+
+    if (!isValidQuantityValue(sanitizedQuantity)) {
+      setAddItemError(`Quantity must be a number between 0 and ${MAX_QUANTITY_VALUE}.`)
+      return
+    }
+
+    setAddItemError(null)
+
     try {
-      const existing = await itemService.searchDuplicate(roomId, newItemName)
+      const existing = await itemService.searchDuplicate(roomId, sanitizedItemName)
       if (existing) {
-        const requestedQty = parseFloat(newItemQuantity) || 1
+        const requestedQty = parseFloat(sanitizedQuantity) || 1
         Alert.alert(
           'Duplicate Item',
           `"${existing.name}" is already on the list with quantity ${existing.quantity}.`,
@@ -130,16 +177,39 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       const newItem = await itemService.addItem(
         roomId,
         user!.id,
-        newItemName,
-        newItemQuantity.trim(),
-        selectedUnit
+        sanitizeTextInput(newItemName),
+        sanitizeTextInput(newItemQuantity),
+        selectedUnit,
+        selectedTargetMemberIds
       )
       setItems((currentItems) => [newItem, ...currentItems])
       setNewItemName('')
       setNewItemQuantity('1')
+      setSelectedTargetMemberIds([])
+      setAddItemError(null)
     } catch (err: any) {
       Alert.alert('Error', err.message)
     }
+  }
+
+  const toggleTargetMember = (memberUserId: string) => {
+    setSelectedTargetMemberIds((currentIds) =>
+      currentIds.includes(memberUserId)
+        ? currentIds.filter((id) => id !== memberUserId)
+        : [...currentIds, memberUserId]
+    )
+  }
+
+  const getTargetMemberLabel = (item: any) => {
+    if (!item.target_member_ids || item.target_member_ids.length === 0) {
+      return 'Everyone'
+    }
+
+    const selectedNames = members
+      .filter((member) => item.target_member_ids.includes(member.user_id))
+      .map((member) => member.profiles?.name?.split(' ')[0] || 'User')
+
+    return selectedNames.length > 0 ? selectedNames.join(', ') : 'Selected roommates'
   }
 
   const toggleStatus = async (item: ShoppingItem) => {
@@ -228,6 +298,9 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
               <Text fontSize={11} color="$colorSubtitle">
                 Added by {item.profiles?.name || 'Someone'} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
+              <Text fontSize={11} color="$colorSubtitle">
+                For: {getTargetMemberLabel(item)}
+              </Text>
             </YStack>
           </YStack>
         </XStack>
@@ -287,14 +360,25 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             flex={1}
             placeholder="Add to list..."
             value={newItemName}
-            onChangeText={setNewItemName}
+            onChangeText={(value) => {
+              setNewItemName(value)
+              if (addItemError) {
+                setAddItemError(null)
+              }
+            }}
             size="$4"
+            maxLength={MAX_ITEM_NAME_LENGTH}
           />
           <Input
             width={96}
             placeholder="Qty"
             value={newItemQuantity}
-            onChangeText={setNewItemQuantity}
+            onChangeText={(value) => {
+              setNewItemQuantity(value)
+              if (addItemError) {
+                setAddItemError(null)
+              }
+            }}
             keyboardType="numeric"
             size="$4"
           />
@@ -305,6 +389,11 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             size="$4"
           />
         </XStack>
+        {addItemError && (
+          <Text color="$red10" fontSize={13}>
+            {addItemError}
+          </Text>
+        )}
         
         <XStack gap="$2" flexWrap="wrap">
           {UNITS.map(unit => (
@@ -319,6 +408,34 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             </Button>
           ))}
         </XStack>
+
+        <YStack gap="$2">
+          <Text fontWeight="bold">Who is this for?</Text>
+          <XStack gap="$2" flexWrap="wrap">
+            <Button
+              size="$2"
+              theme={selectedTargetMemberIds.length === 0 ? 'active' : undefined}
+              variant={selectedTargetMemberIds.length === 0 ? undefined : 'outlined'}
+              onPress={() => setSelectedTargetMemberIds([])}
+            >
+              Everyone
+            </Button>
+            {members.map((member) => (
+              <Button
+                key={member.user_id}
+                size="$2"
+                theme={selectedTargetMemberIds.includes(member.user_id) ? 'active' : undefined}
+                variant={selectedTargetMemberIds.includes(member.user_id) ? undefined : 'outlined'}
+                onPress={() => toggleTargetMember(member.user_id)}
+              >
+                {member.profiles?.name?.split(' ')[0] || 'User'}
+              </Button>
+            ))}
+          </XStack>
+          <Text fontSize={12} color="$colorSubtitle">
+            Leave it on Everyone, or select one or more roommates for this item.
+          </Text>
+        </YStack>
       </YStack>
 
       <FlatList

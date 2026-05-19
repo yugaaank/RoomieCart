@@ -92,11 +92,32 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
     }
   }
 
+  const handleCancel = async (requestId: string) => {
+    try {
+      await itemService.cancelChangeRequest(requestId)
+      Alert.alert('Cancelled', 'Your quantity change request has been cancelled.')
+      fetchRequests()
+    } catch (err: any) {
+      Alert.alert('Error', err.message)
+    }
+  }
+
   const renderRequest = ({ item }: { item: any }) => {
     const votes = item.item_change_request_votes || []
     const yesVotes = votes.filter((vote: any) => vote.vote === 'yes').length
     const noVotes = votes.filter((vote: any) => vote.vote === 'no').length
-    const eligibleMembers = members.filter((member: any) => member.user_id !== item.requested_by)
+    const targetMemberIds = item.shopping_items?.target_member_ids || []
+    const eligibleMembers = members.filter((member: any) => {
+      if (member.user_id === item.requested_by) {
+        return false
+      }
+
+      if (targetMemberIds.length === 0) {
+        return true
+      }
+
+      return targetMemberIds.includes(member.user_id)
+    })
     const eligibleVoterCount = eligibleMembers.length
     const currentUserVote = votes.find((vote: any) => vote.voter_id === user?.id)
     const isRequester = item.requested_by === user?.id
@@ -105,6 +126,13 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
     const pendingMembers = eligibleMembers.filter((member: any) => !voteByUserId.has(member.user_id))
     const yesVoters = eligibleMembers.filter((member: any) => voteByUserId.get(member.user_id) === 'yes')
     const noVoters = eligibleMembers.filter((member: any) => voteByUserId.get(member.user_id) === 'no')
+    const appliesToLabel =
+      targetMemberIds.length === 0
+        ? 'Everyone'
+        : members
+            .filter((member: any) => targetMemberIds.includes(member.user_id))
+            .map((member: any) => member.profiles?.name || 'Unknown')
+            .join(', ')
 
     return (
       <Card elevation="$2" borderWidth={1} borderColor="$borderColor" padding="$4" marginBottom="$3">
@@ -127,6 +155,9 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
           </YStack>
 
           <YStack gap="$2">
+            <Text color="$colorSubtitle" fontSize={12}>
+              Applies to: {appliesToLabel}
+            </Text>
             <XStack ai="center" gap="$2">
               <Check size={14} color="$green10" />
               <Text color="$colorSubtitle">Yes: {yesVotes}/{eligibleVoterCount}</Text>
@@ -148,7 +179,7 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
             <XStack ai="center" gap="$2">
               <Clock3 size={14} color="$yellow10" />
               <Text color="$colorSubtitle">
-                Change applies only if every other roommate votes YES.
+                Change applies only if every eligible roommate votes YES.
               </Text>
             </XStack>
             {pendingMembers.length > 0 && (
@@ -164,10 +195,23 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
             </Text>
           )}
 
+          <Text color="$colorSubtitle" fontSize={12}>
+            Requested {new Date(item.created_at).toLocaleString()}
+          </Text>
+
           {isRequester ? (
-            <Text color="$colorSubtitle">
-              Waiting for roommates to vote.
-            </Text>
+            <YStack gap="$2">
+              <Text color="$colorSubtitle">
+                Waiting for roommates to vote.
+              </Text>
+              <Button
+                theme="red"
+                variant="outlined"
+                onPress={() => handleCancel(item.id)}
+              >
+                Cancel Request
+              </Button>
+            </YStack>
           ) : currentUserVote ? (
             <Text color="$colorSubtitle">
               You voted {currentUserVote.vote.toUpperCase()}.

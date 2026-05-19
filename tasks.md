@@ -66,17 +66,17 @@ This file tracks the progress of the RoomieCart MVP features as defined in the p
 - [x] Input new desired quantity
 - [x] Required reason field (min 10 chars)
 - [x] Submit request → item gets NEGOTIATING badge
-- [ ] Only one pending request per item at a time (block duplicate requests)
-- [ ] Requestor can cancel own pending request
+- [x] Only one pending request per item at a time (block duplicate requests)
+- [x] Requestor can cancel own pending request
 
 ### Negotiation Center Screen
 - [x] List all pending requests for the room
 - [x] Per request: item name, current qty, requested qty, reason, who requested, when
-- [x] Approve button → updates item quantity, clears badge, marks request approved
-- [x] Reject button → clears badge, marks request rejected, quantity unchanged
-- [ ] Requestor cannot approve/reject their own request
+- [x] All roommates must vote YES → updates item quantity, clears badge, marks request approved
+- [x] Any roommate voting NO → clears badge, marks request rejected, quantity unchanged
+- [x] Requestor cannot approve/reject their own request
 - [x] Empty state (no pending requests)
-- [ ] Badge count on nav tab (number of pending requests)
+- [x] Badge count on nav tab (number of pending requests)
 
 ### Post-resolution
 - [ ] Push notification placeholder (log only in MVP, wire up post-MVP)

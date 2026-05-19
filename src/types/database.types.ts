@@ -35,6 +35,7 @@ export type ShoppingItem = {
   quantity: string
   unit: string | null
   added_by: string
+  target_member_ids: string[]
   status: 'active' | 'purchased' | 'archived' | 'discussion_pending'
   created_at: string
   updated_at: string

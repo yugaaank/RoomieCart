@@ -5,8 +5,8 @@ import { useAuthStore } from '../store/authStore'
 import { useRoomStore } from '../store/roomStore'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
-import { Container, YStack, XStack, Text, Button, Card, Title } from '../components/ui'
-import { Copy, RefreshCw, LogOut, Trash2, User, ShieldCheck } from '@tamagui/lucide-icons'
+import { Container, YStack, XStack, Text, Button, Card } from '../components/ui'
+import { Copy, RefreshCw, LogOut, Trash2, User, ShieldCheck, UserMinus } from '@tamagui/lucide-icons'
 import * as Clipboard from 'expo-clipboard'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomSettings'>
@@ -117,6 +117,34 @@ export default function RoomSettingsScreen({ route, navigation }: Props) {
     )
   }
 
+  const handleRemoveMember = (member: any) => {
+    Alert.alert(
+      'Remove Member',
+      `Remove ${member.profiles?.name || 'this member'} from the room?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setProcessing(true)
+            try {
+              await roomService.removeMember(roomId, member.user_id)
+              setMembers((currentMembers) =>
+                currentMembers.filter((currentMember) => currentMember.user_id !== member.user_id)
+              )
+              Alert.alert('Success', 'Member removed from the room')
+            } catch (err: any) {
+              Alert.alert('Error', err.message)
+            } finally {
+              setProcessing(false)
+            }
+          }
+        }
+      ]
+    )
+  }
+
   const renderMember = ({ item }: { item: any }) => (
     <XStack ai="center" jc="space-between" paddingVertical="$2">
       <XStack ai="center" gap="$3">
@@ -128,12 +156,25 @@ export default function RoomSettingsScreen({ route, navigation }: Props) {
           <Text fontSize={12} color="$colorSubtitle">Joined {new Date(item.joined_at).toLocaleDateString()}</Text>
         </YStack>
       </XStack>
-      {item.role === 'owner' && (
-        <XStack ai="center" gap="$1" bc="$blue2" px="$2" py="$1" br="$4">
-          <ShieldCheck size={12} color="$blue10" />
-          <Text fontSize={10} color="$blue10" fontWeight="bold">OWNER</Text>
-        </XStack>
-      )}
+      <XStack ai="center" gap="$2">
+        {item.role === 'owner' && (
+          <XStack ai="center" gap="$1" bc="$blue2" px="$2" py="$1" br="$4">
+            <ShieldCheck size={12} color="$blue10" />
+            <Text fontSize={10} color="$blue10" fontWeight="bold">OWNER</Text>
+          </XStack>
+        )}
+        {isOwner && item.user_id !== user?.id && item.role !== 'owner' && (
+          <Button
+            size="$2"
+            theme="red"
+            icon={UserMinus}
+            onPress={() => handleRemoveMember(item)}
+            disabled={processing}
+          >
+            Remove
+          </Button>
+        )}
+      </XStack>
     </XStack>
   )
 
