@@ -1,5 +1,5 @@
-import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
-import { FlatList, Alert, ScrollView } from 'react-native'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
+import { FlatList, Alert, ScrollView, StyleSheet } from 'react-native'
 import { itemService } from '../services/itemService'
 import { roomService } from '../services/roomService'
 import { useAuthStore } from '../store/authStore'
@@ -8,21 +8,29 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { useRealtimeItems } from '../hooks/useRealtimeItems'
 import RequestChangeModal from '../components/RequestChangeModal'
+import AddItemSheet from '../components/AddItemSheet'
 import { supabase } from '../lib/supabase'
-import { Container, YStack, XStack, Text, Button, Input, Card } from '../components/ui'
-import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle, Settings, ChevronDown, ChevronUp, Tag, DollarSign, Info, MapPin } from '@tamagui/lucide-icons'
-import {
-  MAX_ITEM_NAME_LENGTH,
-  MAX_QUANTITY_VALUE,
-  isValidQuantityValue,
-  sanitizeTextInput,
-} from '../lib/validation'
+import { Container, YStack, XStack, Text, Button, Card } from '../components/ui'
+import { 
+  Plus, 
+  Check, 
+  ShoppingCart, 
+  Trash2, 
+  MessageSquare, 
+  AlertCircle, 
+  Settings, 
+  Tag, 
+  DollarSign, 
+  Info, 
+  MapPin,
+  Filter,
+  User,
+  LayoutGrid
+} from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
 
-const UNITS = ['pcs', 'kg', 'g', 'L', 'ml', 'pack', 'box', 'other']
 const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Frozen', 'Pantry', 'Cleaning', 'Personal Care', 'Other']
-const PRIORITIES = ['low', 'medium', 'high']
 
 export default function RoomDetailsScreen({ route, navigation }: Props) {
   const { roomId, roomName } = route.params
@@ -30,26 +38,19 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   
   const [items, setItems] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
-  
-  // Basic Form
-  const [newItemName, setNewItemName] = useState('')
-  const [newItemQuantity, setNewItemQuantity] = useState('1')
-  const [selectedUnit, setSelectedUnit] = useState('pcs')
-  const [selectedTargetMemberIds, setSelectedTargetMemberIds] = useState<string[]>([])
-  
-  const [category, setCategory] = useState('')
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
-  const [notes, setNotes] = useState('')
-  const [estimatedPrice, setEstimatedPrice] = useState('')
-  const [store, setStore] = useState('')
-
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [pendingRequestCount, setPendingRequestCount] = useState(0)
-  const [addItemError, setAddItemError] = useState<string | null>(null)
-
+  
+  // Modals
   const [selectedItem, setSelectedItem] = useState<ShoppingItem | null>(null)
-  const [isModalVisible, setIsModalVisible] = useState(false)
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false)
+  const [isAddSheetVisible, setIsAddSheetVisible] = useState(false)
+
+  // Filters
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null)
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null)
+  const [sortByCategory, setSortByCategory] = useState(false)
 
   const fetchItems = useCallback(async () => {
     try {
@@ -80,7 +81,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             theme="active" 
             onPress={() => navigation.navigate('PendingRequests', { roomId })}
           >
-            {pendingRequestCount > 0 ? `Requests (${pendingRequestCount})` : 'Requests'}
+            {pendingRequestCount > 0 ? `(${pendingRequestCount})` : ''}
           </Button>
           <Button 
             size="$2" 
@@ -125,112 +126,27 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     fetchItems()
   }
 
-  const handleAddItem = async () => {
-    const sanitizedItemName = sanitizeTextInput(newItemName)
-    const sanitizedQuantity = sanitizeTextInput(newItemQuantity)
-    const priceNum = estimatedPrice ? parseFloat(estimatedPrice) : undefined
-
-    if (!sanitizedItemName) {
-      setAddItemError('Enter an item name.')
-      return
-    }
-
-    if (!isValidQuantityValue(sanitizedQuantity)) {
-      setAddItemError(`Quantity must be a number between 0 and ${MAX_QUANTITY_VALUE}.`)
-      return
-    }
-
-    setAddItemError(null)
-
-    try {
-      const existing = await itemService.searchDuplicate(roomId, sanitizedItemName)
-      if (existing) {
-        const requestedQty = parseFloat(sanitizedQuantity) || 1
-        Alert.alert(
-          'Duplicate Item',
-          `"${existing.name}" is already on the list.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Add Anyway', onPress: () => performAddItem() },
-            { 
-              text: 'Merge Qty', 
-              onPress: () => {
-                const currentQty = parseFloat(existing.quantity) || 0
-                const mergedQty = (currentQty + requestedQty).toString()
-                handleMerge(existing.id, mergedQty)
-              } 
-            }
-          ]
-        )
-      } else {
-        await performAddItem()
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message)
-    }
-  }
-
-  const handleMerge = async (itemId: string, newQty: string) => {
-    try {
-      await itemService.mergeItemQuantity(itemId, newQty)
-      fetchItems()
-    } catch (err: any) {
-      Alert.alert('Error', err.message)
-    }
-  }
-
-  const performAddItem = async () => {
+  const handleAddData = async (data: any) => {
     try {
       const newItem = await itemService.addItem(
         roomId,
         user!.id,
-        sanitizeTextInput(newItemName),
-        sanitizeTextInput(newItemQuantity),
-        selectedUnit,
-        selectedTargetMemberIds,
+        data.name,
+        data.quantity,
+        data.unit,
+        data.targetMemberIds,
         {
-          category: category || undefined,
-          priority: priority,
-          notes: notes.trim() || undefined,
-          estimated_price: estimatedPrice ? parseFloat(estimatedPrice) : undefined,
-          store: store.trim() || undefined
+          category: data.category,
+          priority: data.priority,
+          notes: data.notes,
+          estimated_price: data.estimated_price,
+          store: data.store
         }
       )
       setItems((currentItems) => [newItem, ...currentItems])
-      
-      // Reset Form
-      setNewItemName('')
-      setNewItemQuantity('1')
-      setSelectedTargetMemberIds([])
-      setCategory('')
-      setPriority('medium')
-      setNotes('')
-      setEstimatedPrice('')
-      setStore('')
-      setAddItemError(null)
     } catch (err: any) {
-      Alert.alert('Error', err.message)
+      throw err
     }
-  }
-
-  const toggleTargetMember = (memberUserId: string) => {
-    setSelectedTargetMemberIds((currentIds) =>
-      currentIds.includes(memberUserId)
-        ? currentIds.filter((id) => id !== memberUserId)
-        : [...currentIds, memberUserId]
-    )
-  }
-
-  const getTargetMemberLabel = (item: any) => {
-    if (!item.target_member_ids || item.target_member_ids.length === 0) {
-      return 'Everyone'
-    }
-
-    const selectedNames = members
-      .filter((member) => item.target_member_ids.includes(member.user_id))
-      .map((member) => member.profiles?.name?.split(' ')[0] || 'User')
-
-    return selectedNames.length > 0 ? selectedNames.join(', ') : 'Selected'
   }
 
   const toggleStatus = async (item: ShoppingItem) => {
@@ -263,13 +179,49 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       'Actions',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Propose Changes', onPress: () => setIsModalVisible(true) },
+        { text: 'Propose Changes', onPress: () => setIsEditModalVisible(true) },
         { text: 'Delete Item', style: 'destructive', onPress: () => deleteItem(item.id) }
       ]
     )
   }
 
-  const renderItem = ({ item }: { item: ShoppingItem | any }) => {
+  const filteredAndSortedItems = useMemo(() => {
+    let result = [...items]
+
+    // Filtering
+    if (selectedCategoryFilter) {
+      result = result.filter(item => item.category === selectedCategoryFilter)
+    }
+    if (selectedMemberFilter) {
+      result = result.filter(item => 
+        !item.target_member_ids || 
+        item.target_member_ids.length === 0 || 
+        item.target_member_ids.includes(selectedMemberFilter)
+      )
+    }
+
+    // Sorting
+    if (sortByCategory) {
+      result.sort((a, b) => {
+        const catA = a.category || 'Z-Other'
+        const catB = b.category || 'Z-Other'
+        if (catA < catB) return -1
+        if (catA > catB) return 1
+        return 0
+      })
+    }
+
+    // Secondary sort: active first, then created_at
+    result.sort((a, b) => {
+      if (a.status === 'purchased' && b.status !== 'purchased') return 1
+      if (a.status !== 'purchased' && b.status === 'purchased') return -1
+      return 0
+    })
+
+    return result
+  }, [items, selectedCategoryFilter, selectedMemberFilter, sortByCategory])
+
+  const renderItem = ({ item }: { item: any }) => {
     const priorityColor = item.priority === 'high' ? '$red10' : item.priority === 'low' ? '$blue10' : '$colorSubtitle'
     
     return (
@@ -357,7 +309,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
                   </XStack>
                 )}
                 <Text fontSize={10} color="$colorSubtitle">
-                  Added by {item.profiles?.name || 'Someone'} • For: {getTargetMemberLabel(item)}
+                  Added by {item.profiles?.name || 'Someone'}
                 </Text>
               </YStack>
             </YStack>
@@ -378,177 +330,133 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   return (
     <Container padding="$0">
-      <YStack padding="$4" backgroundColor="$backgroundStrong" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
-        {/* Required Section */}
-        <YStack gap="$3">
-          <XStack gap="$3">
-            <Input
-              flex={1}
-              placeholder="Item name..."
-              value={newItemName}
-              onChangeText={setNewItemName}
-              size="$4"
-              maxLength={MAX_ITEM_NAME_LENGTH}
-            />
-            <Input
-              width={70}
-              placeholder="Qty"
-              value={newItemQuantity}
-              onChangeText={setNewItemQuantity}
-              keyboardType="numeric"
-              size="$4"
-            />
+      <YStack bc="$backgroundStrong" p="$3" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
+        {/* Sorting & Category Filter */}
+        <YStack gap="$2">
+          <XStack ai="center" jc="space-between">
+            <XStack ai="center" gap="$2">
+              <Filter size={16} color="$colorSubtitle" />
+              <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">FILTERS</Text>
+            </XStack>
             <Button 
-              theme="active" 
-              icon={Plus} 
-              onPress={handleAddItem}
-              size="$4"
-            />
+              size="$2" 
+              bc={sortByCategory ? '$blue5' : 'transparent'}
+              icon={LayoutGrid} 
+              onPress={() => setSortByCategory(!sortByCategory)}
+              chromeless
+            >
+              Sort by Category
+            </Button>
           </XStack>
-
-          <YStack gap="$2">
-            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">UNIT</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack gap="$1">
-                {UNITS.map(u => (
-                  <Button 
-                    key={u} 
-                    size="$2" 
-                    backgroundColor={selectedUnit === u ? '$blue9' : '$background'}
-                    color={selectedUnit === u ? 'white' : '$color'}
-                    onPress={() => setSelectedUnit(u)}
-                    borderWidth={1}
-                    borderColor={selectedUnit === u ? '$blue9' : '$borderColor'}
-                  >
-                    {u}
-                  </Button>
-                ))}
-              </XStack>
-            </ScrollView>
-          </YStack>
-
-          <YStack gap="$2">
-            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">WHO IS THIS FOR?</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack gap="$1">
-                <Button 
-                  size="$2" 
-                  backgroundColor={selectedTargetMemberIds.length === 0 ? '$blue9' : '$background'}
-                  color={selectedTargetMemberIds.length === 0 ? 'white' : '$color'}
-                  onPress={() => setSelectedTargetMemberIds([])}
-                  borderWidth={1}
-                  borderColor={selectedTargetMemberIds.length === 0 ? '$blue9' : '$borderColor'}
-                >
-                  Everyone
-                </Button>
-                {members.map(m => (
-                  <Button 
-                    key={m.user_id} 
-                    size="$2" 
-                    backgroundColor={selectedTargetMemberIds.includes(m.user_id) ? '$blue9' : '$background'}
-                    color={selectedTargetMemberIds.includes(m.user_id) ? 'white' : '$color'}
-                    onPress={() => toggleTargetMember(m.user_id)}
-                    borderWidth={1}
-                    borderColor={selectedTargetMemberIds.includes(m.user_id) ? '$blue9' : '$borderColor'}
-                  >
-                    {m.profiles?.name?.split(' ')[0]}
-                  </Button>
-                ))}
-              </XStack>
-            </ScrollView>
-          </YStack>
-        </YStack>
-
-        <YStack borderTopWidth={1} borderColor="$borderColor" paddingTop="$3" gap="$3">
-          <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">EXTRA DETAILS (OPTIONAL)</Text>
           
-          <YStack gap="$2">
-            <Text fontSize={11} fontWeight="bold">CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack gap="$1">
-                {CATEGORIES.map(c => (
-                  <Button 
-                    key={c} 
-                    size="$2" 
-                    backgroundColor={category === c ? '$blue10' : '$background'}
-                    color={category === c ? 'white' : '$color'}
-                    onPress={() => setCategory(c)}
-                    borderWidth={1}
-                    borderColor={category === c ? '$blue10' : '$borderColor'}
-                  >
-                    {c}
-                  </Button>
-                ))}
-              </XStack>
-            </ScrollView>
-          </YStack>
-
-          <XStack gap="$3">
-            <YStack f={1} gap="$1">
-              <Text fontSize={11} fontWeight="bold">PRIORITY</Text>
-              <XStack gap="$1">
-                {PRIORITIES.map(p => (
-                  <Button 
-                    key={p} 
-                    f={1} 
-                    size="$2" 
-                    backgroundColor={priority === p ? '$blue10' : '$background'}
-                    color={priority === p ? 'white' : '$color'}
-                    onPress={() => setPriority(p as any)}
-                    borderWidth={1}
-                    borderColor={priority === p ? '$blue10' : '$borderColor'}
-                  >
-                    {p.charAt(0).toUpperCase()}
-                  </Button>
-                ))}
-              </XStack>
-            </YStack>
-            <YStack f={1} gap="$1">
-              <Text fontSize={11} fontWeight="bold">EST. PRICE</Text>
-              <Input size="$3" value={estimatedPrice} onChangeText={setEstimatedPrice} keyboardType="numeric" placeholder="$0.00" />
-            </YStack>
-            <YStack f={1} gap="$1">
-              <Text fontSize={11} fontWeight="bold">STORE</Text>
-              <Input size="$3" value={store} onChangeText={setStore} placeholder="Costco..." />
-            </YStack>
-          </XStack>
-
-          <YStack gap="$1">
-            <Text fontSize={11} fontWeight="bold">NOTES</Text>
-            <Input size="$3" value={notes} onChangeText={setNotes} placeholder="Brand, size, etc." />
-          </YStack>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap="$1">
+              <Button 
+                size="$2" 
+                backgroundColor={selectedCategoryFilter === null ? '$blue9' : '$background'}
+                color={selectedCategoryFilter === null ? 'white' : '$color'}
+                onPress={() => setSelectedCategoryFilter(null)}
+                borderWidth={1}
+                borderColor={selectedCategoryFilter === null ? '$blue9' : '$borderColor'}
+              >
+                All Categories
+              </Button>
+              {CATEGORIES.map(cat => (
+                <Button 
+                  key={cat} 
+                  size="$2" 
+                  backgroundColor={selectedCategoryFilter === cat ? '$blue9' : '$background'}
+                  color={selectedCategoryFilter === cat ? 'white' : '$color'}
+                  onPress={() => setSelectedCategoryFilter(cat)}
+                  borderWidth={1}
+                  borderColor={selectedCategoryFilter === cat ? '$blue9' : '$borderColor'}
+                >
+                  {cat}
+                </Button>
+              ))}
+            </XStack>
+          </ScrollView>
         </YStack>
 
-        {addItemError && (
-          <Text color="$red10" fontSize={12} marginTop="$1">
-            {addItemError}
-          </Text>
-        )}
+        {/* Member Filter */}
+        <YStack gap="$2">
+          <XStack ai="center" gap="$2">
+            <User size={16} color="$colorSubtitle" />
+            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">SHOPPING FOR</Text>
+          </XStack>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap="$1">
+              <Button 
+                size="$2" 
+                backgroundColor={selectedMemberFilter === null ? '$blue9' : '$background'}
+                color={selectedMemberFilter === null ? 'white' : '$color'}
+                onPress={() => setSelectedMemberFilter(null)}
+                borderWidth={1}
+                borderColor={selectedMemberFilter === null ? '$blue9' : '$borderColor'}
+              >
+                Everyone
+              </Button>
+              {members.map(m => (
+                <Button 
+                  key={m.user_id} 
+                  size="$2" 
+                  backgroundColor={selectedMemberFilter === m.user_id ? '$blue9' : '$background'}
+                  color={selectedMemberFilter === m.user_id ? 'white' : '$color'}
+                  onPress={() => setSelectedMemberFilter(m.user_id)}
+                  borderWidth={1}
+                  borderColor={selectedMemberFilter === m.user_id ? '$blue9' : '$borderColor'}
+                >
+                  {m.profiles?.name?.split(' ')[0]}
+                </Button>
+              ))}
+            </XStack>
+          </ScrollView>
+        </YStack>
       </YStack>
 
       <FlatList
-        data={items}
+        data={filteredAndSortedItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         refreshing={refreshing}
         onRefresh={onRefresh}
         ListEmptyComponent={
           <YStack ai="center" jc="center" padding="$10" gap="$4">
             <ShoppingCart size={48} color="$colorSubtitle" opacity={0.5} />
             <Text textAlign="center" color="$colorSubtitle">
-              Your shopping list is empty.
+              No items found.
             </Text>
           </YStack>
         }
       />
 
+      {/* Floating Add Button */}
+      <Button
+        position="absolute"
+        bottom={30}
+        right={30}
+        size="$6"
+        circular
+        theme="active"
+        icon={Plus}
+        elevation="$4"
+        onPress={() => setIsAddSheetVisible(true)}
+      />
+
+      <AddItemSheet 
+        visible={isAddSheetVisible}
+        onClose={() => setIsAddSheetVisible(false)}
+        onAdd={handleAddData}
+        members={members}
+      />
+
       <RequestChangeModal
-        visible={isModalVisible}
+        visible={isEditModalVisible}
         item={selectedItem}
         userId={user!.id}
         roomMembers={members}
-        onClose={() => setIsModalVisible(false)}
+        onClose={() => setIsEditModalVisible(false)}
         onSuccess={() => {
           fetchItems()
           setSelectedItem(null)
