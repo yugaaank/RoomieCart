@@ -11,7 +11,7 @@ export default function SignupScreen({ navigation }: Props) {
 
   const signup = async () => {
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     })
 
@@ -29,6 +29,8 @@ export default function SignupScreen({ navigation }: Props) {
       <TextInput
         placeholder="Email"
         autoCapitalize="none"
+        keyboardType="email-address"
+        autoCorrect={false}
         value={email}
         onChangeText={setEmail}
         style={{ borderWidth: 1, padding: 12 }}

@@ -67,6 +67,11 @@ export default function HomeScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('JoinRoom')}
         />
         <Button
+          title="My Profile"
+          color="#666"
+          onPress={() => navigation.navigate('Profile')}
+        />
+        <Button
           title="Logout"
           color="red"
           onPress={() => supabase.auth.signOut()}

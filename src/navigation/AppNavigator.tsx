@@ -6,6 +6,7 @@ import HomeScreen from '../screens/HomeScreen'
 import CreateRoomScreen from '../screens/CreateRoomScreen'
 import JoinRoomScreen from '../screens/JoinRoomScreen'
 import RoomDetailsScreen from '../screens/RoomDetailsScreen'
+import ProfileScreen from '../screens/ProfileScreen'
 import { useAuthStore } from '../store/authStore'
 import { View, ActivityIndicator } from 'react-native'
 
@@ -16,6 +17,7 @@ export type RootStackParamList = {
   CreateRoom: undefined
   JoinRoom: undefined
   RoomDetails: { roomId: string; roomName: string }
+  Profile: undefined
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -61,6 +63,11 @@ export default function AppNavigator() {
             <Stack.Screen
               name="RoomDetails"
               component={RoomDetailsScreen}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{ title: 'My Profile' }}
             />
           </>
         ) : (

@@ -11,7 +11,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   const login = async () => {
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     })
 
@@ -25,6 +25,8 @@ export default function LoginScreen({ navigation }: Props) {
       <TextInput
         placeholder="Email"
         autoCapitalize="none"
+        keyboardType="email-address"
+        autoCorrect={false}
         value={email}
         onChangeText={setEmail}
         style={{ borderWidth: 1, padding: 12 }}
