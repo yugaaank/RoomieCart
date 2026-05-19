@@ -3,10 +3,22 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import LoginScreen from '../screens/LoginScreen'
 import SignupScreen from '../screens/SignupScreen'
 import HomeScreen from '../screens/HomeScreen'
+import CreateRoomScreen from '../screens/CreateRoomScreen'
+import JoinRoomScreen from '../screens/JoinRoomScreen'
+import RoomDetailsScreen from '../screens/RoomDetailsScreen'
 import { useAuthStore } from '../store/authStore'
 import { View, ActivityIndicator } from 'react-native'
 
-const Stack = createNativeStackNavigator()
+export type RootStackParamList = {
+  Login: undefined
+  Signup: undefined
+  Home: undefined
+  CreateRoom: undefined
+  JoinRoom: undefined
+  RoomDetails: { roomId: string; roomName: string }
+}
+
+const Stack = createNativeStackNavigator<RootStackParamList>()
 
 export default function AppNavigator() {
   const user = useAuthStore((state) => state.user)
@@ -30,10 +42,27 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator>
         {user ? (
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-          />
+          <>
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ title: 'My Rooms' }}
+            />
+            <Stack.Screen
+              name="CreateRoom"
+              component={CreateRoomScreen}
+              options={{ title: 'Create Room' }}
+            />
+            <Stack.Screen
+              name="JoinRoom"
+              component={JoinRoomScreen}
+              options={{ title: 'Join Room' }}
+            />
+            <Stack.Screen
+              name="RoomDetails"
+              component={RoomDetailsScreen}
+            />
+          </>
         ) : (
           <>
             <Stack.Screen
