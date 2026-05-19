@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { View, TextInput, Button, Alert, ActivityIndicator } from 'react-native'
+import { Alert } from 'react-native'
 import { useRoomStore } from '../store/roomStore'
 import { useAuthStore } from '../store/authStore'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
+import { Container, YStack, Text, Input, Button } from '../components/ui'
+import { Plus } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateRoom'>
 
@@ -32,19 +34,27 @@ export default function CreateRoomScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={{ padding: 20, gap: 12 }}>
-      <TextInput
-        placeholder="Room Name (e.g. My Apartment)"
-        value={name}
-        onChangeText={setName}
-        style={{ borderWidth: 1, padding: 12, borderRadius: 8 }}
-      />
+    <Container>
+      <YStack gap="$6" paddingVertical="$4">
+        <YStack gap="$2">
+          <Text fontWeight="bold">Room Name</Text>
+          <Input
+            placeholder="e.g. My Apartment, Vacation 2026"
+            value={name}
+            onChangeText={setName}
+            size="$4"
+          />
+        </YStack>
 
-      {loading ? (
-        <ActivityIndicator />
-      ) : (
-        <Button title="Create Room" onPress={handleCreate} />
-      )}
-    </View>
+        <Button 
+          theme="active" 
+          icon={Plus} 
+          onPress={handleCreate} 
+          disabled={loading}
+        >
+          {loading ? 'Creating...' : 'Create Room'}
+        </Button>
+      </YStack>
+    </Container>
   )
 }

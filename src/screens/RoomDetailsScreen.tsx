@@ -1,11 +1,14 @@
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
-import { View, Text, FlatList, TextInput, Button, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
+import { FlatList, Alert } from 'react-native'
 import { itemService } from '../services/itemService'
 import { useAuthStore } from '../store/authStore'
 import { ShoppingItem } from '../types/database.types'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
 import { useRealtimeItems } from '../hooks/useRealtimeItems'
+import RequestChangeModal from '../components/RequestChangeModal'
+import { Container, YStack, XStack, Text, Button, Input, Card } from '../components/ui'
+import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
 
@@ -16,6 +19,9 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [newItemName, setNewItemName] = useState('')
   const [loading, setLoading] = useState(true)
+
+  const [selectedItem, setSelectedItem] = useState<ShoppingItem | null>(null)
+  const [isModalVisible, setIsModalVisible] = useState(false)
 
   const fetchItems = useCallback(async () => {
     try {
@@ -36,14 +42,12 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     fetchItems()
   }, [fetchItems])
 
-  // Enable Realtime
   useRealtimeItems(roomId, fetchItems)
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) return
 
     try {
-      // Check for duplicates
       const existing = await itemService.searchDuplicate(roomId, newItemName)
       if (existing) {
         Alert.alert(
@@ -91,62 +95,130 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     }
   }
 
-  const renderItem = ({ item }: { item: ShoppingItem }) => (
-    <View style={{ 
-      flexDirection: 'row', 
-      padding: 16, 
-      borderBottomWidth: 1, 
-      borderBottomColor: '#eee',
-      alignItems: 'center',
-      backgroundColor: item.status === 'purchased' ? '#f9f9f9' : 'white'
-    }}>
-      <TouchableOpacity 
-        style={{ flex: 1 }}
-        onPress={() => toggleStatus(item)}
-      >
-        <Text style={{ 
-          fontSize: 16, 
-          textDecorationLine: item.status === 'purchased' ? 'line-through' : 'none',
-          color: item.status === 'purchased' ? '#aaa' : '#000'
-        }}>
-          {item.name} {item.quantity !== '1' ? `(${item.quantity})` : ''}
-        </Text>
-      </TouchableOpacity>
+  const handleLongPress = (item: ShoppingItem) => {
+    setSelectedItem(item)
+    Alert.alert(
+      item.name,
+      'Actions',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Request Qty Change', onPress: () => setIsModalVisible(true) },
+        { text: 'Delete Item', style: 'destructive', onPress: () => deleteItem(item.id) }
+      ]
+    )
+  }
 
-      <TouchableOpacity onPress={() => deleteItem(item.id)}>
-        <Text style={{ color: 'red', marginLeft: 10 }}>Delete</Text>
-      </TouchableOpacity>
-    </View>
+  const renderItem = ({ item }: { item: ShoppingItem }) => (
+    <Card 
+      elevation={item.status === 'active' ? '$2' : '$0'}
+      borderWidth={1}
+      borderColor="$borderColor"
+      backgroundColor={item.status === 'purchased' ? '$backgroundTransparent' : '$background'}
+      padding="$4" 
+      marginBottom="$2"
+      onPress={() => toggleStatus(item)}
+      onLongPress={() => handleLongPress(item)}
+      opacity={item.status === 'purchased' ? 0.6 : 1}
+    >
+      <XStack jc="space-between" ai="center">
+        <XStack gap="$3" ai="center" flex={1}>
+          <YStack 
+            width={24} 
+            height={24} 
+            borderRadius={12} 
+            borderWidth={1} 
+            borderColor={item.status === 'purchased' ? '$green10' : '$colorSubtitle'}
+            ai="center" 
+            jc="center"
+            backgroundColor={item.status === 'purchased' ? '$green10' : 'transparent'}
+          >
+            {item.status === 'purchased' && <Check size={14} color="white" />}
+          </YStack>
+          
+          <YStack flex={1}>
+            <Text 
+              fontSize={16} 
+              fontWeight="500"
+              textDecorationLine={item.status === 'purchased' ? 'line-through' : 'none'}
+            >
+              {item.name}
+            </Text>
+            <XStack ai="center" gap="$1">
+              <Text fontSize={14} color="$colorSubtitle">
+                Qty: {item.quantity} {item.unit || ''}
+              </Text>
+              {item.status === 'discussion_pending' && (
+                <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2">
+                  <AlertCircle size={12} color="$yellow10" />
+                  <Text fontSize={12} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
+                </XStack>
+              )}
+            </XStack>
+          </YStack>
+        </XStack>
+        
+        <XStack gap="$2">
+          {item.status === 'discussion_pending' && (
+            <Button size="$2" circular icon={MessageSquare} chromeless />
+          )}
+          <Button 
+            size="$2" 
+            circular 
+            icon={Trash2} 
+            chromeless 
+            theme="red" 
+            onPress={() => deleteItem(item.id)} 
+          />
+        </XStack>
+      </XStack>
+    </Card>
   )
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#ddd' }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TextInput
-            placeholder="Add new item..."
+    <Container padding="$0">
+      <YStack padding="$4" backgroundColor="$backgroundStrong" borderBottomWidth={1} borderColor="$borderColor">
+        <XStack gap="$3">
+          <Input
+            flex={1}
+            placeholder="Add to list..."
             value={newItemName}
             onChangeText={setNewItemName}
-            style={{ flex: 1, borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 5 }}
+            size="$4"
           />
-          <Button title="Add" onPress={handleAddItem} />
-        </View>
-      </View>
+          <Button 
+            theme="active" 
+            icon={Plus} 
+            onPress={handleAddItem}
+            size="$4"
+          />
+        </XStack>
+      </YStack>
 
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginTop: 20, color: '#999' }}>
-              Your shopping list is empty.
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={{ padding: 16 }}
+        ListEmptyComponent={
+          <YStack ai="center" jc="center" padding="$10" gap="$4">
+            <ShoppingCart size={48} color="$colorSubtitle" opacity={0.5} />
+            <Text textAlign="center" color="$colorSubtitle">
+              Your shopping list is empty. Add something above!
             </Text>
-          }
-        />
-      )}
-    </View>
+          </YStack>
+        }
+      />
+
+      <RequestChangeModal
+        visible={isModalVisible}
+        item={selectedItem}
+        userId={user!.id}
+        onClose={() => setIsModalVisible(false)}
+        onSuccess={() => {
+          fetchItems()
+          setSelectedItem(null)
+        }}
+      />
+    </Container>
   )
 }

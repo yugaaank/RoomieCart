@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { TamaguiProvider } from 'tamagui'
+import tamaguiConfig from './tamagui.config'
 import { supabase } from './src/lib/supabase'
 import { useAuthStore } from './src/store/authStore'
 import AppNavigator from './src/navigation/AppNavigator'
@@ -26,5 +28,9 @@ export default function App() {
     }
   }, [])
 
-  return <AppNavigator />
+  return (
+    <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
+      <AppNavigator />
+    </TamaguiProvider>
+  )
 }

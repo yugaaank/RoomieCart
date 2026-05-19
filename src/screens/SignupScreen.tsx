@@ -1,55 +1,90 @@
 import { useState } from 'react'
-import { View, TextInput, Button, Alert } from 'react-native'
+import { Alert } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { RootStackParamList } from '../navigation/AppNavigator'
+import { Container, YStack, Title, Text, Input, Button } from '../components/ui'
+import { UserPlus } from '@tamagui/lucide-icons'
 
-type Props = NativeStackScreenProps<any>
+type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>
 
 export default function SignupScreen({ navigation }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const signup = async () => {
+    setLoading(true)
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
 
     if (error) {
-      Alert.alert(error.message)
+      Alert.alert('Signup Failed', error.message)
+      setLoading(false)
       return
     }
 
-    Alert.alert('Account created')
+    Alert.alert('Account created', 'You can now log in.')
     navigation.navigate('Login')
+    setLoading(false)
   }
 
   return (
-    <View style={{ padding: 20, gap: 12 }}>
-      <TextInput
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoCorrect={false}
-        value={email}
-        onChangeText={setEmail}
-        style={{ borderWidth: 1, padding: 12 }}
-      />
+    <Container jc="center">
+      <YStack gap="$6" padding="$4">
+        <YStack gap="$2" ai="center">
+          <Title fontSize={32}>Join RoomieCart</Title>
+          <Text color="$colorSubtitle">Start collaborating with your roommates</Text>
+        </YStack>
 
-      <TextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        style={{ borderWidth: 1, padding: 12 }}
-      />
+        <YStack gap="$4">
+          <YStack gap="$2">
+            <Text fontWeight="bold">Email</Text>
+            <Input
+              placeholder="email@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              value={email}
+              onChangeText={setEmail}
+              size="$4"
+            />
+          </YStack>
 
-      <Button title="Signup" onPress={signup} />
+          <YStack gap="$2">
+            <Text fontWeight="bold">Password</Text>
+            <Input
+              placeholder="Min 6 characters"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              size="$4"
+            />
+          </YStack>
 
-      <Button
-        title="Back to Login"
-        onPress={() => navigation.navigate('Login')}
-      />
-    </View>
+          <Button 
+            theme="active" 
+            size="$5" 
+            onPress={signup} 
+            disabled={loading}
+            icon={UserPlus}
+          >
+            {loading ? 'Signing up...' : 'Sign Up'}
+          </Button>
+        </YStack>
+
+        <YStack ai="center" gap="$2">
+          <Text color="$colorSubtitle">Already have an account?</Text>
+          <Button 
+            chromeless 
+            onPress={() => navigation.navigate('Login')}
+          >
+            Back to Login
+          </Button>
+        </YStack>
+      </YStack>
+    </Container>
   )
 }
