@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { ShoppingItem } from '../types/database.types'
 
 export function useRealtimeItems(roomId: string, onUpdate: () => void) {
   useEffect(() => {

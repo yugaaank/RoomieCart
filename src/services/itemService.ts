@@ -1,6 +1,19 @@
 import { supabase } from '../lib/supabase'
 import { ShoppingItem } from '../types/database.types'
 
+function sortItemsWithPurchasedLast(items: any[]) {
+  return [...items].sort((a, b) => {
+    if (a.status === b.status) {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+
+    if (a.status === 'purchased') return 1
+    if (b.status === 'purchased') return -1
+
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
 export const itemService = {
   async getRoomItems(roomId: string) {
     const { data, error } = await supabase
@@ -15,7 +28,7 @@ export const itemService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data as any[]
+    return sortItemsWithPurchasedLast(data as any[])
   },
 
   async addItem(roomId: string, userId: string, name: string, quantity: string = '1', unit?: string) {
@@ -95,12 +108,32 @@ export const itemService = {
     return data as ShoppingItem | null
   },
 
-  async createChangeRequest(itemId: string, userId: string, newQuantity: string, reason?: string) {
+  async createChangeRequest(
+    itemId: string,
+    userId: string,
+    oldQuantity: string,
+    newQuantity: string,
+    reason?: string
+  ) {
+    const { data: existingRequest, error: existingRequestError } = await supabase
+      .from('item_change_requests')
+      .select('id')
+      .eq('item_id', itemId)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (existingRequestError) throw existingRequestError
+
+    if (existingRequest) {
+      throw new Error('There is already a pending quantity request for this item')
+    }
+
     const { data, error } = await supabase
       .from('item_change_requests')
       .insert({
         item_id: itemId,
         requested_by: userId,
+        old_quantity: oldQuantity,
         new_quantity: newQuantity,
         reason,
       })
@@ -116,25 +149,38 @@ export const itemService = {
       .from('item_change_requests')
       .select(`
         *,
-        shopping_items!inner(room_id),
-        profiles:requested_by(name)
+        shopping_items!inner(
+          id,
+          room_id,
+          name,
+          quantity,
+          unit,
+          status
+        ),
+        profiles:requested_by(name),
+        item_change_request_votes (
+          id,
+          voter_id,
+          vote,
+          created_at,
+          updated_at
+        )
       `)
       .eq('shopping_items.room_id', roomId)
       .eq('status', 'pending')
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     return data
   },
 
-  async resolveChangeRequest(requestId: string, userId: string, status: 'approved' | 'rejected') {
-    const { error } = await supabase
-      .from('item_change_requests')
-      .update({
-        status,
-        resolved_by: userId,
-      })
-      .eq('id', requestId)
+  async submitChangeRequestVote(requestId: string, vote: 'yes' | 'no') {
+    const { data, error } = await supabase.rpc('submit_change_request_vote', {
+      request_id_param: requestId,
+      vote_param: vote,
+    })
 
     if (error) throw error
+    return data
   }
 }

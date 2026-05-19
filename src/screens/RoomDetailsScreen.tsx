@@ -22,6 +22,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   const [items, setItems] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [newItemName, setNewItemName] = useState('')
+  const [newItemQuantity, setNewItemQuantity] = useState('1')
   const [selectedUnit, setSelectedUnit] = useState('pcs')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -82,10 +83,15 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) return
+    if (!newItemQuantity.trim()) {
+      Alert.alert('Error', 'Please enter a quantity')
+      return
+    }
 
     try {
       const existing = await itemService.searchDuplicate(roomId, newItemName)
       if (existing) {
+        const requestedQty = parseFloat(newItemQuantity) || 1
         Alert.alert(
           'Duplicate Item',
           `"${existing.name}" is already on the list with quantity ${existing.quantity}.`,
@@ -96,7 +102,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
               text: 'Merge Qty', 
               onPress: () => {
                 const currentQty = parseFloat(existing.quantity) || 0
-                const mergedQty = (currentQty + 1).toString()
+                const mergedQty = (currentQty + requestedQty).toString()
                 handleMerge(existing.id, mergedQty)
               } 
             }
@@ -121,9 +127,16 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   const performAddItem = async () => {
     try {
-      const newItem = await itemService.addItem(roomId, user!.id, newItemName, '1', selectedUnit)
-      setItems([newItem, ...items])
+      const newItem = await itemService.addItem(
+        roomId,
+        user!.id,
+        newItemName,
+        newItemQuantity.trim(),
+        selectedUnit
+      )
+      setItems((currentItems) => [newItem, ...currentItems])
       setNewItemName('')
+      setNewItemQuantity('1')
     } catch (err: any) {
       Alert.alert('Error', err.message)
     }
@@ -133,7 +146,11 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     const newStatus = item.status === 'active' ? 'purchased' : 'active'
     try {
       await itemService.updateItemStatus(item.id, newStatus)
-      setItems(items.map(i => i.id === item.id ? { ...i, status: newStatus } : i))
+      setItems((currentItems) =>
+        currentItems.map((currentItem) =>
+          currentItem.id === item.id ? { ...currentItem, status: newStatus } : currentItem
+        )
+      )
     } catch (err: any) {
       Alert.alert('Error', err.message)
     }
@@ -142,7 +159,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   const deleteItem = async (itemId: string) => {
     try {
       await itemService.deleteItem(itemId)
-      setItems(items.filter(i => i.id !== itemId))
+      setItems((currentItems) => currentItems.filter((item) => item.id !== itemId))
     } catch (err: any) {
       Alert.alert('Error', err.message)
     }
@@ -271,6 +288,14 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             placeholder="Add to list..."
             value={newItemName}
             onChangeText={setNewItemName}
+            size="$4"
+          />
+          <Input
+            width={96}
+            placeholder="Qty"
+            value={newItemQuantity}
+            onChangeText={setNewItemQuantity}
+            keyboardType="numeric"
             size="$4"
           />
           <Button 

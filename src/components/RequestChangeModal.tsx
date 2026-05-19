@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Modal } from 'react-native'
+import { Alert, Modal } from 'react-native'
 import { itemService } from '../services/itemService'
 import { ShoppingItem } from '../types/database.types'
 import { YStack, XStack, Text, Button, Input, Card } from './ui'
 import { AlertTriangle, Send, X } from '@tamagui/lucide-icons'
-import { Alert } from 'react-native'
 
 interface Props {
   visible: boolean
@@ -27,13 +26,25 @@ export default function RequestChangeModal({ visible, item, userId, onClose, onS
       return
     }
 
+    if (newQuantity.trim() === item.quantity) {
+      Alert.alert('Error', 'Enter a different quantity to create a request')
+      return
+    }
+
     setLoading(true)
     try {
-      await itemService.createChangeRequest(item.id, userId, newQuantity.trim(), reason.trim())
-      // Also update item status locally or let realtime handle it
+      await itemService.createChangeRequest(
+        item.id,
+        userId,
+        item.quantity,
+        newQuantity.trim(),
+        reason.trim()
+      )
       await itemService.updateItemStatus(item.id, 'discussion_pending')
       
       Alert.alert('Request Sent', 'Your roommates will be notified of the quantity change request.')
+      setNewQuantity('')
+      setReason('')
       onSuccess()
       onClose()
     } catch (err: any) {

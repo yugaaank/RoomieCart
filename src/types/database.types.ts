@@ -39,3 +39,12 @@ export type ShoppingItem = {
   created_at: string
   updated_at: string
 }
+
+export type ItemChangeRequestVote = {
+  id: string
+  request_id: string
+  voter_id: string
+  vote: 'yes' | 'no'
+  created_at: string
+  updated_at: string
+}
