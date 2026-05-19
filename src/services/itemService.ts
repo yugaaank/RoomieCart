@@ -5,12 +5,17 @@ export const itemService = {
   async getRoomItems(roomId: string) {
     const { data, error } = await supabase
       .from('shopping_items')
-      .select('*')
+      .select(`
+        *,
+        profiles:added_by (
+          name
+        )
+      `)
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data as ShoppingItem[]
+    return data as any[]
   },
 
   async addItem(roomId: string, userId: string, name: string, quantity: string = '1', unit?: string) {
@@ -26,11 +31,36 @@ export const itemService = {
         quantity,
         unit,
       })
-      .select()
+      .select(`
+        *,
+        profiles:added_by (
+          name
+        )
+      `)
       .single()
 
     if (error) throw error
-    return data as ShoppingItem
+    return data as any
+  },
+
+  async mergeItemQuantity(itemId: string, newQuantity: string) {
+    const { data, error } = await supabase
+      .from('shopping_items')
+      .update({ 
+        quantity: newQuantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId)
+      .select(`
+        *,
+        profiles:added_by (
+          name
+        )
+      `)
+      .single()
+
+    if (error) throw error
+    return data
   },
 
   async updateItemStatus(itemId: string, status: ShoppingItem['status']) {

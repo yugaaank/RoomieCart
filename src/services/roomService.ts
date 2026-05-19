@@ -86,7 +86,7 @@ export const roomService = {
       .from('room_members')
       .select(`
         *,
-        profiles (
+        profiles:user_id (
           id,
           name,
           avatar_url
@@ -96,5 +96,35 @@ export const roomService = {
 
     if (error) throw error
     return data
+  },
+
+  async regenerateInviteCode(roomId: string) {
+    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const { error } = await supabase
+      .from('rooms')
+      .update({ invite_code: newCode })
+      .eq('id', roomId)
+
+    if (error) throw error
+    return newCode
+  },
+
+  async leaveRoom(roomId: string, userId: string) {
+    const { error } = await supabase
+      .from('room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+
+    if (error) throw error
+  },
+
+  async deleteRoom(roomId: string) {
+    const { error } = await supabase
+      .from('rooms')
+      .delete()
+      .eq('id', roomId)
+
+    if (error) throw error
   }
 }

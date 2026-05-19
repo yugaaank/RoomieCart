@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
-import { FlatList, Alert } from 'react-native'
+import { FlatList, Alert, ScrollView } from 'react-native'
 import { itemService } from '../services/itemService'
+import { roomService } from '../services/roomService'
 import { useAuthStore } from '../store/authStore'
 import { ShoppingItem } from '../types/database.types'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -8,41 +9,76 @@ import { RootStackParamList } from '../navigation/AppNavigator'
 import { useRealtimeItems } from '../hooks/useRealtimeItems'
 import RequestChangeModal from '../components/RequestChangeModal'
 import { Container, YStack, XStack, Text, Button, Input, Card } from '../components/ui'
-import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle } from '@tamagui/lucide-icons'
+import { Plus, Check, ShoppingCart, Trash2, MessageSquare, AlertCircle, Settings } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
+
+const UNITS = ['pcs', 'kg', 'g', 'L', 'ml', 'pack', 'box', 'other']
 
 export default function RoomDetailsScreen({ route, navigation }: Props) {
   const { roomId, roomName } = route.params
   const user = useAuthStore((state) => state.user)
   
-  const [items, setItems] = useState<ShoppingItem[]>([])
+  const [items, setItems] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [newItemName, setNewItemName] = useState('')
+  const [selectedUnit, setSelectedUnit] = useState('pcs')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const [selectedItem, setSelectedItem] = useState<ShoppingItem | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
 
   const fetchItems = useCallback(async () => {
     try {
-      const data = await itemService.getRoomItems(roomId)
-      setItems(data)
+      const [itemsData, membersData] = await Promise.all([
+        itemService.getRoomItems(roomId),
+        roomService.getRoomMembers(roomId)
+      ])
+      setItems(itemsData)
+      setMembers(membersData)
     } catch (err: any) {
-      Alert.alert('Error fetching items', err.message)
+      Alert.alert('Error fetching room data', err.message)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [roomId])
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: roomName })
-  }, [navigation, roomName])
+    navigation.setOptions({ 
+      title: roomName,
+      headerRight: () => (
+        <XStack gap="$2" ai="center">
+          <Button 
+            size="$2" 
+            icon={AlertCircle} 
+            theme="active" 
+            onPress={() => navigation.navigate('PendingRequests', { roomId })}
+          >
+            Requests
+          </Button>
+          <Button 
+            size="$2" 
+            icon={Settings} 
+            chromeless
+            onPress={() => navigation.navigate('RoomSettings', { roomId })}
+          />
+        </XStack>
+      )
+    })
+  }, [navigation, roomName, roomId])
 
   useEffect(() => {
     fetchItems()
   }, [fetchItems])
 
   useRealtimeItems(roomId, fetchItems)
+
+  const onRefresh = () => {
+    setRefreshing(true)
+    fetchItems()
+  }
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) return
@@ -52,10 +88,18 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       if (existing) {
         Alert.alert(
           'Duplicate Item',
-          `"${existing.name}" is already on the list. Add it anyway?`,
+          `"${existing.name}" is already on the list with quantity ${existing.quantity}.`,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Add Anyway', onPress: () => performAddItem() }
+            { text: 'Add Anyway', onPress: () => performAddItem() },
+            { 
+              text: 'Merge Qty', 
+              onPress: () => {
+                const currentQty = parseFloat(existing.quantity) || 0
+                const mergedQty = (currentQty + 1).toString()
+                handleMerge(existing.id, mergedQty)
+              } 
+            }
           ]
         )
       } else {
@@ -66,9 +110,18 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     }
   }
 
+  const handleMerge = async (itemId: string, newQty: string) => {
+    try {
+      await itemService.mergeItemQuantity(itemId, newQty)
+      fetchItems()
+    } catch (err: any) {
+      Alert.alert('Error', err.message)
+    }
+  }
+
   const performAddItem = async () => {
     try {
-      const newItem = await itemService.addItem(roomId, user!.id, newItemName)
+      const newItem = await itemService.addItem(roomId, user!.id, newItemName, '1', selectedUnit)
       setItems([newItem, ...items])
       setNewItemName('')
     } catch (err: any) {
@@ -108,7 +161,7 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
     )
   }
 
-  const renderItem = ({ item }: { item: ShoppingItem }) => (
+  const renderItem = ({ item }: { item: any }) => (
     <Card 
       elevation={item.status === 'active' ? '$2' : '$0'}
       borderWidth={1}
@@ -143,17 +196,22 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             >
               {item.name}
             </Text>
-            <XStack ai="center" gap="$1">
-              <Text fontSize={14} color="$colorSubtitle">
-                Qty: {item.quantity} {item.unit || ''}
+            <YStack gap="$1">
+              <XStack ai="center" gap="$1">
+                <Text fontSize={14} color="$colorSubtitle">
+                  Qty: {item.quantity} {item.unit || ''}
+                </Text>
+                {item.status === 'discussion_pending' && (
+                  <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2">
+                    <AlertCircle size={12} color="$yellow10" />
+                    <Text fontSize={12} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
+                  </XStack>
+                )}
+              </XStack>
+              <Text fontSize={11} color="$colorSubtitle">
+                Added by {item.profiles?.name || 'Someone'} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
-              {item.status === 'discussion_pending' && (
-                <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2">
-                  <AlertCircle size={12} color="$yellow10" />
-                  <Text fontSize={12} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
-                </XStack>
-              )}
-            </XStack>
+            </YStack>
           </YStack>
         </XStack>
         
@@ -176,7 +234,37 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   return (
     <Container padding="$0">
-      <YStack padding="$4" backgroundColor="$backgroundStrong" borderBottomWidth={1} borderColor="$borderColor">
+      <YStack padding="$4" backgroundColor="$backgroundStrong" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
+        <XStack gap="$2" ai="center" paddingBottom="$2">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap="$2">
+              {members.map((m) => (
+                <XStack 
+                  key={m.id} 
+                  ai="center" 
+                  gap="$1" 
+                  bc="$background" 
+                  px="$2" 
+                  py="$1" 
+                  br="$10" 
+                  borderWidth={1} 
+                  borderColor="$borderColor"
+                >
+                  <YStack bc="$blue5" w={16} h={16} br={8} ai="center" jc="center">
+                    <Text fontSize={8} color="white" fontWeight="bold">
+                      {(m.profiles?.name || 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </YStack>
+                  <Text fontSize={12} fontWeight={m.user_id === user?.id ? "bold" : "400"}>
+                    {m.profiles?.name?.split(' ')[0] || 'User'}
+                  </Text>
+                  {m.role === 'owner' && <Text fontSize={8}>👑</Text>}
+                </XStack>
+              ))}
+            </XStack>
+          </ScrollView>
+        </XStack>
+
         <XStack gap="$3">
           <Input
             flex={1}
@@ -192,6 +280,20 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
             size="$4"
           />
         </XStack>
+        
+        <XStack gap="$2" flexWrap="wrap">
+          {UNITS.map(unit => (
+            <Button 
+              key={unit}
+              size="$2"
+              theme={selectedUnit === unit ? 'active' : undefined}
+              onPress={() => setSelectedUnit(unit)}
+              variant={selectedUnit === unit ? undefined : 'outlined'}
+            >
+              {unit}
+            </Button>
+          ))}
+        </XStack>
       </YStack>
 
       <FlatList
@@ -199,6 +301,8 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 16 }}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         ListEmptyComponent={
           <YStack ai="center" jc="center" padding="$10" gap="$4">
             <ShoppingCart size={48} color="$colorSubtitle" opacity={0.5} />

@@ -7,6 +7,8 @@ import CreateRoomScreen from '../screens/CreateRoomScreen'
 import JoinRoomScreen from '../screens/JoinRoomScreen'
 import RoomDetailsScreen from '../screens/RoomDetailsScreen'
 import ProfileScreen from '../screens/ProfileScreen'
+import PendingRequestsScreen from '../screens/PendingRequestsScreen'
+import RoomSettingsScreen from '../screens/RoomSettingsScreen'
 import { useAuthStore } from '../store/authStore'
 import { View, ActivityIndicator } from 'react-native'
 
@@ -18,6 +20,8 @@ export type RootStackParamList = {
   JoinRoom: undefined
   RoomDetails: { roomId: string; roomName: string }
   Profile: undefined
+  PendingRequests: { roomId: string }
+  RoomSettings: { roomId: string }
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -68,6 +72,16 @@ export default function AppNavigator() {
               name="Profile"
               component={ProfileScreen}
               options={{ title: 'My Profile' }}
+            />
+            <Stack.Screen
+              name="PendingRequests"
+              component={PendingRequestsScreen}
+              options={{ title: 'Pending Requests' }}
+            />
+            <Stack.Screen
+              name="RoomSettings"
+              component={RoomSettingsScreen}
+              options={{ title: 'Room Settings' }}
             />
           </>
         ) : (
