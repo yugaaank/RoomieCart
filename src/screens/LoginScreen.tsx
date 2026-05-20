@@ -3,8 +3,15 @@ import { Alert } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
-import { Container, YStack, Title, Text, Input, Button } from '../components/ui'
+import { Container, YStack, Text, Input, Button, XStack } from '../components/ui'
 import { LogIn } from '@tamagui/lucide-icons'
+import { SvgXml } from 'react-native-svg'
+
+const logoXml = `
+<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 21V10L12 3L21 10V21H16V14H8V21H3Z" stroke="#466349" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+`
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>
 
@@ -30,8 +37,11 @@ export default function LoginScreen({ navigation }: Props) {
     <Container jc="center">
       <YStack gap="$6" padding="$4">
         <YStack gap="$2" ai="center">
-          <Title fontSize={32}>RoomieCart</Title>
-          <Text color="$colorSubtitle">Shared shopping made simple</Text>
+          <XStack ai="center" gap="$3">
+            <SvgXml xml={logoXml} width={40} height={40} />
+            <Text fontSize={36} fontWeight="700" color="$color">RoomieCart</Text>
+          </XStack>
+          <Text color="$colorSubtitle" fontSize={16}>Shared shopping made simple</Text>
         </YStack>
 
         <YStack gap="$4">
@@ -60,7 +70,7 @@ export default function LoginScreen({ navigation }: Props) {
           </YStack>
 
           <Button 
-            theme="active" 
+            variant="primary" 
             size="$5" 
             onPress={login} 
             disabled={loading}
@@ -73,7 +83,7 @@ export default function LoginScreen({ navigation }: Props) {
         <YStack ai="center" gap="$2">
           <Text color="$colorSubtitle">Don't have an account?</Text>
           <Button 
-            chromeless 
+            variant="ghost" 
             onPress={() => navigation.navigate('Signup')}
           >
             Create an Account

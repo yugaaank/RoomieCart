@@ -143,7 +143,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                   value={name} 
                   onChangeText={setName} 
                   size="$4"
-                  backgroundColor="$backgroundStrong"
+                  backgroundColor="$background"
                 />
               </YStack>
 
@@ -156,7 +156,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                     onChangeText={setQuantity} 
                     keyboardType="numeric" 
                     size="$4" 
-                    backgroundColor="$backgroundStrong"
+                    backgroundColor="$background"
                   />
                 </YStack>
                 <YStack f={2} gap="$1.5">
@@ -167,8 +167,8 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                         <Button 
                           key={u} 
                           size="$2" 
-                          backgroundColor={unit === u ? '$blue9' : '$backgroundStrong'}
-                          color={unit === u ? 'white' : '$color'}
+                          backgroundColor={unit === u ? '$primary' : '$backgroundStrong'}
+                          color={unit === u ? '$onPrimary' : '$color'}
                           onPress={() => setUnit(u)}
                         >{u}</Button>
                       ))}
@@ -183,16 +183,16 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                   <XStack gap="$1.5">
                     <Button 
                       size="$2.5" 
-                      backgroundColor={targetMemberIds.length === 0 ? '$blue9' : '$backgroundStrong'}
-                      color={targetMemberIds.length === 0 ? 'white' : '$color'}
+                      backgroundColor={targetMemberIds.length === 0 ? '$primary' : '$backgroundStrong'}
+                      color={targetMemberIds.length === 0 ? '$onPrimary' : '$color'}
                       onPress={() => setTargetMemberIds([])}
                     >Everyone</Button>
                     {members.map(m => (
                       <Button 
                         key={m.user_id} 
                         size="$2.5" 
-                        backgroundColor={targetMemberIds.includes(m.user_id) ? '$blue9' : '$backgroundStrong'}
-                        color={targetMemberIds.includes(m.user_id) ? 'white' : '$color'}
+                        backgroundColor={targetMemberIds.includes(m.user_id) ? '$primary' : '$backgroundStrong'}
+                        color={targetMemberIds.includes(m.user_id) ? '$onPrimary' : '$color'}
                         onPress={() => toggleTargetMember(m.user_id)}
                       >
                         {m.profiles?.name?.split(' ')[0]}
@@ -213,11 +213,11 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                         <Button 
                           key={c} 
                           size="$2" 
-                          backgroundColor={category === c ? '$blue10' : '$background'}
-                          color={category === c ? 'white' : '$color'}
+                          backgroundColor={category === c ? '$primary' : '$background'}
+                          color={category === c ? '$onPrimary' : '$color'}
                           onPress={() => setCategory(c)}
                           borderWidth={1}
-                          borderColor={category === c ? '$blue10' : '$borderColor'}
+                          borderColor={category === c ? '$primary' : '$borderColor'}
                         >{c}</Button>
                       ))}
                     </XStack>
@@ -233,11 +233,11 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                           key={p} 
                           f={1} 
                           size="$2" 
-                          backgroundColor={priority === p ? '$blue10' : '$background'}
-                          color={priority === p ? 'white' : '$color'}
+                          backgroundColor={priority === p ? '$primary' : '$background'}
+                          color={priority === p ? '$onPrimary' : '$color'}
                           onPress={() => setPriority(p as any)}
                           borderWidth={1}
-                          borderColor={priority === p ? '$blue10' : '$borderColor'}
+                          borderColor={priority === p ? '$primary' : '$borderColor'}
                         >{p.charAt(0).toUpperCase()}</Button>
                       ))}
                     </XStack>
@@ -281,7 +281,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
               {error && <Text color="$red10" fontSize={13} textAlign="center">{error}</Text>}
 
               <Button 
-                theme="active" 
+                variant="primary"
                 size="$5" 
                 fontWeight="bold"
                 icon={loading ? undefined : Plus} 

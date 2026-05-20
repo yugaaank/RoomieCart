@@ -1,25 +1,28 @@
 import { useState, useEffect } from 'react'
-import { Alert } from 'react-native'
+import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { useAuthStore } from '../store/authStore'
+import { useThemeStore } from '../store/themeStore'
+import { useRoomStore } from '../store/roomStore'
 import { profileService } from '../services/profileService'
 import { supabase } from '../lib/supabase'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../navigation/AppNavigator'
-import { Container, YStack, Text, Input, Button, Card, XStack } from '../components/ui'
-import { Save, User as UserIcon, Mail, LogOut } from '@tamagui/lucide-icons'
-import { MAX_PROFILE_NAME_LENGTH, sanitizeTextInput } from '../lib/validation'
+import { Container, YStack, XStack, Text, Button, Card, Switch, Avatar } from '../components/ui'
+import { User as UserIcon, LogOut, Lock, Shield, ChevronRight, Sun, Bell, Plus, Home } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>
 
 export default function ProfileScreen({ navigation }: Props) {
   const user = useAuthStore((state) => state.user)
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const manualTheme = useThemeStore((state) => state.manualTheme)
+  const setManualTheme = useThemeStore((state) => state.setManualTheme)
+  const { rooms, fetchRooms } = useRoomStore()
+  const [name, setName] = useState('Alex Thompson')
+  const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
+      fetchRooms(user.id)
       fetchProfile()
     }
   }, [user])
@@ -27,116 +30,82 @@ export default function ProfileScreen({ navigation }: Props) {
   const fetchProfile = async () => {
     try {
       const data = await profileService.getProfile(user!.id)
-      setName(data.name || '')
+      setName(data.name || 'Alex Thompson')
     } catch (err: any) {
-      Alert.alert('Error', 'Could not fetch profile')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSave = async () => {
-    const sanitizedName = sanitizeTextInput(name)
-
-    if (!sanitizedName) {
-      setError('Name cannot be empty.')
-      return
-    }
-
-    if (sanitizedName.length > MAX_PROFILE_NAME_LENGTH) {
-      setError(`Name must be ${MAX_PROFILE_NAME_LENGTH} characters or fewer.`)
-      return
-    }
-
-    setError(null)
-
-    setSaving(true)
-    try {
-      await profileService.updateProfile(user!.id, { name: sanitizedName })
-      Alert.alert('Success', 'Profile updated successfully')
-    } catch (err: any) {
-      Alert.alert('Error', 'Could not update profile')
-    } finally {
-      setSaving(false)
+      console.error(err)
     }
   }
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive', 
-          onPress: () => supabase.auth.signOut() 
-        }
-      ]
-    )
+    Alert.alert('Logout', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: () => supabase.auth.signOut() }
+    ])
   }
 
-  return (
-    <Container>
-      <YStack f={1} gap="$6" paddingVertical="$4">
-        <YStack gap="$4">
-          <Card elevation={2} padding="$4" gap="$5">
-            <YStack gap="$2.5">
-              <XStack ai="center" gap="$2">
-                <Mail size={14} color="$colorSubtitle" />
-                <Text fontSize={12} fontWeight="700" color="$colorSubtitle" letterSpacing={0.5}>EMAIL ADDRESS</Text>
-              </XStack>
-              <Text fontSize={16} fontWeight="600" paddingLeft="$6">{user?.email}</Text>
-            </YStack>
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase()
 
-            <YStack gap="$2.5">
-              <XStack ai="center" gap="$2">
-                <UserIcon size={14} color="$colorSubtitle" />
-                <Text fontSize={12} fontWeight="700" color="$colorSubtitle" letterSpacing={0.5}>DISPLAY NAME</Text>
+  return (
+    <Container padding="$0">
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 24 }}>
+        <YStack ai="center" gap="$3" marginTop="$4">
+          <Avatar circular size="$8" borderWidth={2} borderColor="$borderColor" backgroundColor="$primary">
+             <Text color="$onPrimary" fontSize={32} fontWeight="bold">{initials}</Text>
+          </Avatar>
+          <YStack ai="center">
+            <Text fontSize={20} fontWeight="700">{name}</Text>
+            <Text color="$colorSubtitle">{user?.email}</Text>
+          </YStack>
+        </YStack>
+
+        <YStack gap="$4">
+          <Card padding="$4" gap="$2" backgroundColor="$backgroundStrong">
+            <Text fontWeight="600" color="$colorSubtitle" marginBottom="$2">Account Security</Text>
+            <Button variant="ghost" justifyContent="space-between" icon={Lock} onPress={() => setIsPasswordSheetOpen(true)}>
+              <XStack f={1} jc="space-between" ai="center">
+                <Text color="$color">Change Password</Text>
+                <ChevronRight size={16} color="$color"/>
               </XStack>
-              <Input
-                value={name}
-                onChangeText={(value) => {
-                  setName(value)
-                  if (error) {
-                    setError(null)
-                  }
-                }}
-                placeholder="Your Name"
-                size="$4"
-                maxLength={MAX_PROFILE_NAME_LENGTH}
-              />
-              {error && (
-                <Text color="$red10" fontSize={13} paddingLeft="$2">
-                  {error}
-                </Text>
-              )}
-            </YStack>
+            </Button>
+            <Button variant="ghost" justifyContent="space-between" icon={Shield}>
+              <XStack f={1} jc="space-between" ai="center">
+                <Text color="$color">Delete Account</Text>
+                <ChevronRight size={16} color="$color"/>
+              </XStack>
+            </Button>
           </Card>
 
-          <Button 
-            variant="primary"
-            icon={Save} 
-            onPress={handleSave} 
-            disabled={saving || loading}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
+          <Card padding="$4" gap="$2" backgroundColor="$backgroundStrong">
+            <Text fontWeight="600" color="$colorSubtitle" marginBottom="$2">Preferences</Text>
+            <Button variant="ghost" justifyContent="space-between" icon={Bell}>
+              <XStack f={1} jc="space-between" ai="center">
+                <Text color="$color">Notification Preferences</Text>
+                <ChevronRight size={16} color="$color"/>
+              </XStack>
+            </Button>
+          </Card>
+
+          <Card padding="$4" gap="$2" backgroundColor="$backgroundStrong">
+            <Text fontWeight="600" color="$colorSubtitle" marginBottom="$2">Household</Text>
+            {rooms.map(room => (
+              <Button key={room.id} variant="ghost" justifyContent="flex-start" icon={Home} color="$color">{room.name}</Button>
+            ))}
+            <Button variant="ghost" justifyContent="flex-start" icon={Plus} onPress={() => navigation.navigate('JoinRoom')} color="$color">Join New Home</Button>
+            <Button variant="ghost" justifyContent="flex-start" icon={Plus} onPress={() => navigation.navigate('CreateRoom')} color="$color">Create New Room</Button>
+          </Card>
         </YStack>
 
-        <YStack f={1} jc="flex-end" paddingBottom="$4">
-          <Button 
-            variant="outline"
-            theme="red"
-            icon={LogOut} 
-            onPress={handleLogout}
-            borderColor="$red8"
-            color="$red10"
-          >
-            Logout
-          </Button>
-        </YStack>
-      </YStack>
+        <Button 
+          variant="destructive" 
+          icon={LogOut} 
+          onPress={handleLogout} 
+          marginBottom="$4"
+          backgroundColor="#ba1a1a"
+          color="white"
+        >
+          Logout
+        </Button>
+      </ScrollView>
     </Container>
   )
 }

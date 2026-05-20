@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import LoginScreen from '../screens/LoginScreen'
 import SignupScreen from '../screens/SignupScreen'
@@ -10,6 +10,7 @@ import ProfileScreen from '../screens/ProfileScreen'
 import PendingRequestsScreen from '../screens/PendingRequestsScreen'
 import RoomSettingsScreen from '../screens/RoomSettingsScreen'
 import { useAuthStore } from '../store/authStore'
+import { useThemeStore } from '../store/themeStore'
 import { View, ActivityIndicator } from 'react-native'
 
 export type RootStackParamList = {
@@ -29,6 +30,17 @@ const Stack = createNativeStackNavigator<RootStackParamList>()
 export default function AppNavigator() {
   const user = useAuthStore((state) => state.user)
   const loading = useAuthStore((state) => state.loading)
+  const theme = useThemeStore((state) => state.theme)
+
+  const navTheme = {
+    ...(theme === 'light' ? DefaultTheme : DarkTheme),
+    colors: {
+      ...(theme === 'light' ? DefaultTheme.colors : DarkTheme.colors),
+      background: theme === 'light' ? '#faf9f7' : '#1a1c1b',
+      card: theme === 'light' ? '#faf9f7' : '#1a1c1b',
+      text: theme === 'light' ? '#1a1c1b' : '#f1f1ef',
+    },
+  }
 
   if (loading) {
     return (
@@ -43,16 +55,24 @@ export default function AppNavigator() {
       </View>
     )
   }
+return (
+  <NavigationContainer theme={navTheme}>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#faf9f7',
+        },
+        headerTintColor: '#1a1c1b',
+      }}
+    >
+      {user ? (
+// ...
 
-  return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        {user ? (
           <>
             <Stack.Screen
               name="Home"
               component={HomeScreen}
-              options={{ title: 'My Rooms' }}
+              options={{ title: 'RoomieCart' }}
             />
             <Stack.Screen
               name="CreateRoom"

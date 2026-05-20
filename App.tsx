@@ -1,9 +1,11 @@
 import '@tamagui/native/setup-zeego'
-import { useEffect } from 'react'
-import { TamaguiProvider } from 'tamagui'
+import { useEffect, useMemo } from 'react'
+import { useColorScheme } from 'react-native'
+import { TamaguiProvider, Theme } from 'tamagui'
 import tamaguiConfig from './tamagui.config'
 import { supabase } from './src/lib/supabase'
 import { useAuthStore } from './src/store/authStore'
+import { useThemeStore } from './src/store/themeStore'
 import AppNavigator from './src/navigation/AppNavigator'
 
 export default function App() {
@@ -31,7 +33,9 @@ export default function App() {
 
   return (
     <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
-      <AppNavigator />
+      <Theme name="light">
+        <AppNavigator />
+      </Theme>
     </TamaguiProvider>
   )
 }

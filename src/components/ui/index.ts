@@ -1,4 +1,4 @@
-import { styled, YStack, XStack, Text, Button as TButton, Input as TInput, Card as TCard } from 'tamagui'
+import { styled, YStack, XStack, Text, Button as TButton, Input as TInput, Card as TCard, Sheet, Avatar, Switch } from 'tamagui'
 
 export const Container = styled(YStack, {
   name: 'Container',
@@ -6,7 +6,6 @@ export const Container = styled(YStack, {
   backgroundColor: '$background',
   padding: '$4',
 })
-
 export const Card = styled(TCard, {
   name: 'Card',
   backgroundColor: '$background',
@@ -14,24 +13,24 @@ export const Card = styled(TCard, {
   borderWidth: 1,
   borderColor: '$borderColor',
   padding: '$4',
-  elevation: 2,
-  shadowColor: 'rgba(0,0,0,0.1)',
-  shadowOffset: { width: 0, height: 2 },
+  shadowColor: 'rgba(0,0,0,0.04)',
+  shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 1,
-  shadowRadius: 4,
+  shadowRadius: 12,
 })
 
 export const Button = styled(TButton, {
   name: 'Button',
-  borderRadius: '$3',
+  borderRadius: '$lg',
   fontWeight: '600',
   fontSize: 14,
-  height: 44,
+  height: 48,
+  paddingHorizontal: '$4',
   variants: {
     variant: {
       primary: {
-        backgroundColor: '$color',
-        color: '$background',
+        backgroundColor: '$primary',
+        color: '$onPrimary',
         pressStyle: { opacity: 0.9, scale: 0.98 },
       },
       outline: {
@@ -47,7 +46,7 @@ export const Button = styled(TButton, {
         pressStyle: { backgroundColor: '$backgroundStrong', scale: 0.98 },
       },
       destructive: {
-        backgroundColor: '$red9',
+        backgroundColor: '$red10',
         color: 'white',
         pressStyle: { opacity: 0.9, scale: 0.98 },
       }
@@ -61,18 +60,19 @@ export const Button = styled(TButton, {
 export const Input = styled(TInput, {
   name: 'Input',
   backgroundColor: '$background',
-  borderRadius: '$3',
+  borderRadius: '$lg',
   borderWidth: 1,
   borderColor: '$borderColor',
-  height: 44,
+  height: 48,
   paddingHorizontal: '$4',
   fontSize: 14,
   color: '$color',
   focusStyle: {
-    borderColor: '$blue10',
-    borderWidth: 2,
+    borderColor: '$primary',
+    borderWidth: 1,
   }
 })
+
 
 export const Badge = styled(YStack, {
   name: 'Badge',
@@ -104,4 +104,4 @@ export const Badge = styled(YStack, {
   }
 })
 
-export { YStack, XStack, Text }
+export { YStack, XStack, Text, Sheet, Avatar, Switch }
