@@ -1,4 +1,4 @@
-amport { styled, YStack, XStack, Text, Button, Input, Card } from 'tamagui'
+import { styled, YStack, XStack, Text, Button, Input, Card } from 'tamagui'
 
 export const Container = styled(YStack, {
   name: 'Container',

@@ -165,6 +165,11 @@ export default function PendingRequestsScreen({ route, navigation }: Props) {
             {renderChangeItem('Quantity', oldData.quantity, newData.quantity)}
             {renderChangeItem('Unit', oldData.unit, newData.unit)}
             {renderChangeItem('Target Members', oldData.target_member_ids, newData.target_member_ids)}
+            {renderChangeItem('Category', oldData.category, newData.category)}
+            {renderChangeItem('Priority', oldData.priority, newData.priority)}
+            {renderChangeItem('Est. Price', oldData.estimated_price, newData.estimated_price)}
+            {renderChangeItem('Store', oldData.store, newData.store)}
+            {renderChangeItem('Notes', oldData.notes, newData.notes)}
           </YStack>
 
           <YStack gap="$2">

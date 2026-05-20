@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase'
 import { Container, YStack, XStack, Text, Button, Card } from '../components/ui'
 import { 
   Plus, 
+  X,
   Check, 
   ShoppingCart, 
   Trash2, 
@@ -431,17 +432,18 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         }
       />
 
-      {/* Floating Add Button */}
+      {/* Floating Action Button */}
       <Button
         position="absolute"
         bottom={30}
         right={30}
         size="$6"
         circular
-        theme="active"
-        icon={Plus}
+        theme={isAddSheetVisible ? 'red' : 'active'}
+        icon={isAddSheetVisible ? X : Plus}
         elevation="$4"
-        onPress={() => setIsAddSheetVisible(true)}
+        onPress={() => setIsAddSheetVisible(!isAddSheetVisible)}
+        zIndex={2000}
       />
 
       <AddItemSheet 

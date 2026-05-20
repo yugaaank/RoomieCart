@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Modal, ScrollView, StyleSheet } from 'react-native'
-import { YStack, XStack, Text, Button, Input, Container } from './ui'
-import { X, Send, Plus } from '@tamagui/lucide-icons'
+import { KeyboardAvoidingView, Platform } from 'react-native'
+import { YStack, XStack, Text, Button, Input, Sheet } from 'tamagui'
+import { Plus, X } from '@tamagui/lucide-icons'
 import { 
   MAX_ITEM_NAME_LENGTH, 
   MAX_QUANTITY_VALUE, 
@@ -90,42 +90,74 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <YStack f={1} bc="rgba(0,0,0,0.5)" jc="flex-end">
-        <YStack bc="$background" borderTopLeftRadius={20} borderTopRightRadius={20} maxHeight="90%">
-          <YStack p="$4" borderBottomWidth={1} borderColor="$borderColor">
-            <XStack jc="space-between" ai="center">
-              <Text fontSize={20} fontWeight="bold">Add New Item</Text>
-              <Button size="$2" circular icon={X} chromeless onPress={onClose} />
-            </XStack>
-          </YStack>
+    <Sheet
+      forceRemoveScrollEnabled={visible}
+      modal
+      open={visible}
+      onOpenChange={(open) => !open && onClose()}
+      snapPoints={[85]}
+      dismissOnSnapToBottom
+      zIndex={100000}
+      animation="medium"
+    >
+      <Sheet.Overlay 
+        animation="lazy" 
+        enterStyle={{ opacity: 0 }} 
+        exitStyle={{ opacity: 0 }} 
+        backgroundColor="rgba(0,0,0,0.5)"
+      />
+      <Sheet.Frame bc="$background" borderTopLeftRadius={24} borderTopRightRadius={24}>
+        <Sheet.Handle />
+        
+        <YStack p="$4" borderBottomWidth={1} borderColor="$borderColor" ai="center" position="relative">
+          <Text fontSize={20} fontWeight="bold">Add New Item</Text>
+          <Button 
+            position="absolute" 
+            right="$4" 
+            top="$3" 
+            size="$2" 
+            circular 
+            icon={X} 
+            chromeless 
+            onPress={onClose} 
+          />
+        </YStack>
 
-          <ScrollView style={{ padding: 20 }}>
-            <YStack gap="$4" pb="$10">
-              <YStack gap="$1">
-                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">ITEM NAME</Text>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <Sheet.ScrollView 
+            p="$5"
+            contentContainerStyle={{ paddingBottom: 100 }}
+          >
+            <YStack gap="$5">
+              <YStack gap="$1.5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>ITEM NAME</Text>
                 <Input 
                   placeholder="e.g. Milk, Eggs..." 
                   value={name} 
                   onChangeText={setName} 
-                  size="$4" 
+                  size="$4"
+                  backgroundColor="$backgroundStrong"
                 />
               </YStack>
 
-              <XStack gap="$3">
-                <YStack f={1} gap="$1">
-                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">QUANTITY</Text>
+              <XStack gap="$4">
+                <YStack f={1} gap="$1.5">
+                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>QUANTITY</Text>
                   <Input 
                     placeholder="1" 
                     value={quantity} 
                     onChangeText={setQuantity} 
                     keyboardType="numeric" 
                     size="$4" 
+                    backgroundColor="$backgroundStrong"
                   />
                 </YStack>
-                <YStack f={2} gap="$1">
-                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">UNIT</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <YStack f={2} gap="$1.5">
+                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>UNIT</Text>
+                  <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <XStack gap="$1">
                       {UNITS.map(u => (
                         <Button 
@@ -137,16 +169,16 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                         >{u}</Button>
                       ))}
                     </XStack>
-                  </ScrollView>
+                  </Sheet.ScrollView>
                 </YStack>
               </XStack>
 
-              <YStack gap="$2">
-                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">WHO IS THIS FOR?</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <XStack gap="$1">
+              <YStack gap="$2.5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>WHO IS THIS FOR?</Text>
+                <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <XStack gap="$1.5">
                     <Button 
-                      size="$2" 
+                      size="$2.5" 
                       backgroundColor={targetMemberIds.length === 0 ? '$blue9' : '$backgroundStrong'}
                       color={targetMemberIds.length === 0 ? 'white' : '$color'}
                       onPress={() => setTargetMemberIds([])}
@@ -154,7 +186,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                     {members.map(m => (
                       <Button 
                         key={m.user_id} 
-                        size="$2" 
+                        size="$2.5" 
                         backgroundColor={targetMemberIds.includes(m.user_id) ? '$blue9' : '$backgroundStrong'}
                         color={targetMemberIds.includes(m.user_id) ? 'white' : '$color'}
                         onPress={() => toggleTargetMember(m.user_id)}
@@ -163,16 +195,16 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                       </Button>
                     ))}
                   </XStack>
-                </ScrollView>
+                </Sheet.ScrollView>
               </YStack>
 
-              <YStack gap="$4" bc="$backgroundStrong" p="$3" br="$4">
-                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">EXTRA DETAILS (OPTIONAL)</Text>
+              <YStack gap="$4" bc="$backgroundStrong" p="$4" br="$5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>EXTRA DETAILS (OPTIONAL)</Text>
                 
-                <YStack gap="$2">
+                <YStack gap="$2.5">
                   <Text fontSize={11} fontWeight="bold">CATEGORY</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <XStack gap="$1">
+                  <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <XStack gap="$1.5">
                       {CATEGORIES.map(c => (
                         <Button 
                           key={c} 
@@ -180,16 +212,18 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                           backgroundColor={category === c ? '$blue10' : '$background'}
                           color={category === c ? 'white' : '$color'}
                           onPress={() => setCategory(c)}
+                          borderWidth={1}
+                          borderColor={category === c ? '$blue10' : '$borderColor'}
                         >{c}</Button>
                       ))}
                     </XStack>
-                  </ScrollView>
+                  </Sheet.ScrollView>
                 </YStack>
 
-                <XStack gap="$3">
-                  <YStack f={1} gap="$1">
+                <XStack gap="$4">
+                  <YStack f={1} gap="$2">
                     <Text fontSize={11} fontWeight="bold">PRIORITY</Text>
-                    <XStack gap="$1">
+                    <XStack gap="$1.5">
                       {PRIORITIES.map(p => (
                         <Button 
                           key={p} 
@@ -198,42 +232,65 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
                           backgroundColor={priority === p ? '$blue10' : '$background'}
                           color={priority === p ? 'white' : '$color'}
                           onPress={() => setPriority(p as any)}
+                          borderWidth={1}
+                          borderColor={priority === p ? '$blue10' : '$borderColor'}
                         >{p.charAt(0).toUpperCase()}</Button>
                       ))}
                     </XStack>
                   </YStack>
-                  <YStack f={1} gap="$1">
+                  <YStack f={1} gap="$2">
                     <Text fontSize={11} fontWeight="bold">EST. PRICE</Text>
-                    <Input size="$3" value={estimatedPrice} onChangeText={setEstimatedPrice} keyboardType="numeric" placeholder="$0.00" />
+                    <Input 
+                      size="$3" 
+                      value={estimatedPrice} 
+                      onChangeText={setEstimatedPrice} 
+                      keyboardType="numeric" 
+                      placeholder="$0.00" 
+                      backgroundColor="$background"
+                    />
                   </YStack>
                 </XStack>
 
-                <YStack gap="$1">
+                <YStack gap="$2">
                   <Text fontSize={11} fontWeight="bold">STORE</Text>
-                  <Input size="$3" value={store} onChangeText={setStore} placeholder="e.g. Costco" />
+                  <Input 
+                    size="$3" 
+                    value={store} 
+                    onChangeText={setStore} 
+                    placeholder="e.g. Costco" 
+                    backgroundColor="$background"
+                  />
                 </YStack>
 
-                <YStack gap="$1">
+                <YStack gap="$2">
                   <Text fontSize={11} fontWeight="bold">NOTES</Text>
-                  <Input size="$3" value={notes} onChangeText={setNotes} placeholder="Brand, size specifics..." />
+                  <Input 
+                    size="$3" 
+                    value={notes} 
+                    onChangeText={setNotes} 
+                    placeholder="Brand, size specifics..." 
+                    backgroundColor="$background"
+                  />
                 </YStack>
               </YStack>
 
-              {error && <Text color="$red10" fontSize={13}>{error}</Text>}
+              {error && <Text color="$red10" fontSize={13} textAlign="center">{error}</Text>}
 
               <Button 
                 theme="active" 
-                size="$4" 
+                size="$5" 
+                fontWeight="bold"
                 icon={loading ? undefined : Plus} 
                 onPress={handleAdd}
                 disabled={loading}
+                borderRadius="$4"
               >
                 {loading ? 'Adding...' : 'Add to List'}
               </Button>
             </YStack>
-          </ScrollView>
-        </YStack>
-      </YStack>
-    </Modal>
+          </Sheet.ScrollView>
+        </KeyboardAvoidingView>
+      </Sheet.Frame>
+    </Sheet>
   )
 }

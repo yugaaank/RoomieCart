@@ -1,3 +1,4 @@
+import '@tamagui/native/setup-zeego'
 import { useEffect } from 'react'
 import { TamaguiProvider } from 'tamagui'
 import tamaguiConfig from './tamagui.config'

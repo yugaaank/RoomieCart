@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Alert, Modal, ScrollView } from 'react-native'
+import { Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { itemService } from '../services/itemService'
 import { ShoppingItem } from '../types/database.types'
-import { YStack, XStack, Text, Button, Input, Card, Container } from './ui'
-import { AlertTriangle, Send, X, ChevronDown, ChevronUp } from '@tamagui/lucide-icons'
+import { YStack, XStack, Text, Button, Input, Sheet } from 'tamagui'
+import { Send, X } from '@tamagui/lucide-icons'
 import { 
   MAX_ITEM_NAME_LENGTH, 
   MAX_QUANTITY_VALUE, 
@@ -46,7 +46,6 @@ export default function RequestChangeModal({
   
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     if (item && visible) {
@@ -152,163 +151,183 @@ export default function RequestChangeModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <YStack f={1} bc="rgba(0,0,0,0.5)" jc="flex-end">
-        <Container bc="$background" borderTopLeftRadius="$6" borderTopRightRadius="$6" p="$0" maxHeight="90%">
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-            <YStack gap="$4">
-              <XStack jc="space-between" ai="center">
-                <YStack>
-                  <Text fontSize={20} fontWeight="bold">Propose Changes</Text>
-                  <Text color="$colorSubtitle">Update attributes for negotiation</Text>
-                </YStack>
-                <Button size="$2" circular icon={X} chromeless onPress={onClose} />
-              </XStack>
+    <Sheet
+      forceRemoveScrollEnabled={visible}
+      modal
+      open={visible}
+      onOpenChange={(open) => !open && onClose()}
+      snapPoints={[90]}
+      dismissOnSnapToBottom
+      zIndex={100000}
+      animation="medium"
+    >
+      <Sheet.Overlay 
+        animation="lazy" 
+        enterStyle={{ opacity: 0 }} 
+        exitStyle={{ opacity: 0 }} 
+        backgroundColor="rgba(0,0,0,0.5)"
+      />
+      <Sheet.Frame bc="$background" borderTopLeftRadius={24} borderTopRightRadius={24}>
+        <Sheet.Handle />
+        
+        <YStack p="$4" borderBottomWidth={1} borderColor="$borderColor" ai="center" position="relative">
+          <YStack ai="center">
+            <Text fontSize={20} fontWeight="bold">Propose Changes</Text>
+            <Text color="$colorSubtitle" fontSize={14}>{item.name}</Text>
+          </YStack>
+          <Button 
+            position="absolute" 
+            right="$4" 
+            top="$3" 
+            size="$2" 
+            circular 
+            icon={X} 
+            chromeless 
+            onPress={onClose} 
+          />
+        </YStack>
 
-              <YStack gap="$4">
-                <YStack gap="$1">
-                  <Text fontWeight="bold">Item Name</Text>
-                  <Input value={name} onChangeText={setName} size="$4" />
-                </YStack>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <Sheet.ScrollView 
+            p="$5"
+            contentContainerStyle={{ paddingBottom: 100 }}
+          >
+            <YStack gap="$5">
+              <YStack gap="$1.5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>ITEM NAME</Text>
+                <Input value={name} onChangeText={setName} size="$4" backgroundColor="$backgroundStrong" />
+              </YStack>
 
-                <XStack gap="$3">
-                  <YStack f={1} gap="$1">
-                    <Text fontWeight="bold">Quantity</Text>
-                    <Input value={quantity} onChangeText={setQuantity} keyboardType="numeric" size="$4" />
-                  </YStack>
-                  <YStack f={1} gap="$1">
-                    <Text fontWeight="bold">Unit</Text>
-                    <XStack gap="$1" flexWrap="wrap">
-                      {UNITS.slice(0, 4).map(u => (
+              <XStack gap="$4">
+                <YStack f={1} gap="$1.5">
+                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>QUANTITY</Text>
+                  <Input value={quantity} onChangeText={setQuantity} keyboardType="numeric" size="$4" backgroundColor="$backgroundStrong" />
+                </YStack>
+                <YStack f={2} gap="$1.5">
+                  <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>UNIT</Text>
+                  <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <XStack gap="$1">
+                      {UNITS.map(u => (
                         <Button 
                           key={u} 
                           size="$2" 
-                          backgroundColor={unit === u ? '$blue9' : '$background'}
+                          backgroundColor={unit === u ? '$blue9' : '$backgroundStrong'}
                           color={unit === u ? 'white' : '$color'}
                           onPress={() => setUnit(u)}
-                          borderWidth={1}
-                          borderColor={unit === u ? '$blue9' : '$borderColor'}
-                        >
-                          {u}
-                        </Button>
+                        >{u}</Button>
                       ))}
                     </XStack>
-                  </YStack>
-                </XStack>
+                  </Sheet.ScrollView>
+                </YStack>
+              </XStack>
 
-                <Button 
-                  size="$3" 
-                  chromeless 
-                  onPress={() => setShowAdvanced(!showAdvanced)}
-                  iconAfter={showAdvanced ? ChevronUp : ChevronDown}
-                >
-                  {showAdvanced ? 'Hide Advanced Attributes' : 'Edit Advanced Attributes'}
-                </Button>
-
-                {showAdvanced && (
-                  <YStack gap="$4" bc="$backgroundStrong" p="$3" br="$4">
-                    <YStack gap="$1">
-                      <Text fontWeight="bold">Category</Text>
-                      <XStack gap="$1" flexWrap="wrap">
-                        {CATEGORIES.map(c => (
-                          <Button 
-                            key={c} 
-                            size="$2" 
-                            backgroundColor={category === c ? '$blue10' : '$background'}
-                            color={category === c ? 'white' : '$color'}
-                            onPress={() => setCategory(c)}
-                            borderWidth={1}
-                            borderColor={category === c ? '$blue10' : '$borderColor'}
-                          >
-                            {c}
-                          </Button>
-                        ))}
-                      </XStack>
-                    </YStack>
-
-                    <YStack gap="$1">
-                      <Text fontWeight="bold">Priority</Text>
-                      <XStack gap="$2">
-                        {PRIORITIES.map(p => (
-                          <Button 
-                            key={p} 
-                            f={1} 
-                            size="$2" 
-                            backgroundColor={priority === p ? '$blue10' : '$background'}
-                            color={priority === p ? 'white' : '$color'}
-                            onPress={() => setPriority(p as any)}
-                            borderWidth={1}
-                            borderColor={priority === p ? '$blue10' : '$borderColor'}
-                          >
-                            {p.toUpperCase()}
-                          </Button>
-                        ))}
-                      </XStack>
-                    </YStack>
-
-                    <XStack gap="$3">
-                      <YStack f={1} gap="$1">
-                        <Text fontWeight="bold">Est. Price ($)</Text>
-                        <Input value={estimatedPrice} onChangeText={setEstimatedPrice} keyboardType="numeric" size="$4" placeholder="0.00" />
-                      </YStack>
-                      <YStack f={1} gap="$1">
-                        <Text fontWeight="bold">Store</Text>
-                        <Input value={store} onChangeText={setStore} size="$4" placeholder="Costco, Market..." />
-                      </YStack>
-                    </XStack>
-
-                    <YStack gap="$1">
-                      <Text fontWeight="bold">Personal Notes</Text>
-                      <Input value={notes} onChangeText={setNotes} size="$4" placeholder="Brand, size, specifics..." />
-                    </YStack>
-                  </YStack>
-                )}
-
-                <YStack gap="$2">
-                  <Text fontWeight="bold">Who is this for?</Text>
-                  <XStack gap="$2" flexWrap="wrap">
+              <YStack gap="$2.5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>WHO IS THIS FOR?</Text>
+                <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <XStack gap="$1.5">
                     <Button 
-                      size="$2" 
-                      backgroundColor={targetMemberIds.length === 0 ? '$blue9' : '$background'}
+                      size="$2.5" 
+                      backgroundColor={targetMemberIds.length === 0 ? '$blue9' : '$backgroundStrong'}
                       color={targetMemberIds.length === 0 ? 'white' : '$color'}
                       onPress={() => setTargetMemberIds([])}
-                      borderWidth={1}
-                      borderColor={targetMemberIds.length === 0 ? '$blue9' : '$borderColor'}
-                    >
-                      Everyone
-                    </Button>
+                    >Everyone</Button>
                     {roomMembers.map((member) => (
                       <Button 
                         key={member.user_id} 
-                        size="$2" 
-                        backgroundColor={targetMemberIds.includes(member.user_id) ? '$blue9' : '$background'}
+                        size="$2.5" 
+                        backgroundColor={targetMemberIds.includes(member.user_id) ? '$blue9' : '$backgroundStrong'}
                         color={targetMemberIds.includes(member.user_id) ? 'white' : '$color'}
                         onPress={() => toggleTargetMember(member.user_id)}
-                        borderWidth={1}
-                        borderColor={targetMemberIds.includes(member.user_id) ? '$blue9' : '$borderColor'}
                       >
                         {member.profiles?.name?.split(' ')[0] || 'User'}
                       </Button>
                     ))}
                   </XStack>
+                </Sheet.ScrollView>
+              </YStack>
+
+              <YStack gap="$4" bc="$backgroundStrong" p="$4" br="$5">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>EXTRA DETAILS</Text>
+                
+                <YStack gap="$2.5">
+                  <Text fontSize={11} fontWeight="bold">CATEGORY</Text>
+                  <Sheet.ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <XStack gap="$1.5">
+                      {CATEGORIES.map(c => (
+                        <Button 
+                          key={c} 
+                          size="$2" 
+                          backgroundColor={category === c ? '$blue10' : '$background'}
+                          color={category === c ? 'white' : '$color'}
+                          onPress={() => setCategory(c)}
+                          borderWidth={1}
+                          borderColor={category === c ? '$blue10' : '$borderColor'}
+                        >{c}</Button>
+                      ))}
+                    </XStack>
+                  </Sheet.ScrollView>
                 </YStack>
 
-                <YStack gap="$1">
-                  <Text fontWeight="bold">Reason for Changes</Text>
-                  <Input value={reason} onChangeText={setReason} size="$4" height={80} multiline textAlignVertical="top" placeholder="Explain why these updates are needed" />
+                <XStack gap="$4">
+                  <YStack f={1} gap="$2">
+                    <Text fontSize={11} fontWeight="bold">PRIORITY</Text>
+                    <XStack gap="$1.5">
+                      {PRIORITIES.map(p => (
+                        <Button 
+                          key={p} 
+                          f={1} 
+                          size="$2" 
+                          backgroundColor={priority === p ? '$blue10' : '$background'}
+                          color={priority === p ? 'white' : '$color'}
+                          onPress={() => setPriority(p as any)}
+                          borderWidth={1}
+                          borderColor={priority === p ? '$blue10' : '$borderColor'}
+                        >{p.charAt(0).toUpperCase()}</Button>
+                      ))}
+                    </XStack>
+                  </YStack>
+                  <YStack f={1} gap="$2">
+                    <Text fontSize={11} fontWeight="bold">EST. PRICE ($)</Text>
+                    <Input value={estimatedPrice} onChangeText={setEstimatedPrice} keyboardType="numeric" size="$3" placeholder="0.00" backgroundColor="$background" />
+                  </YStack>
+                </XStack>
+
+                <YStack gap="$2">
+                  <Text fontSize={11} fontWeight="bold">STORE</Text>
+                  <Input value={store} onChangeText={setStore} size="$3" placeholder="e.g. Costco" backgroundColor="$background" />
+                </YStack>
+
+                <YStack gap="$2">
+                  <Text fontSize={11} fontWeight="bold">NOTES</Text>
+                  <Input value={notes} onChangeText={setNotes} size="$3" placeholder="Brand, specifics..." backgroundColor="$background" />
                 </YStack>
               </YStack>
 
-              {formError && <Text color="$red10" fontSize={13}>{formError}</Text>}
+              <YStack gap="$2">
+                <Text fontSize={12} fontWeight="bold" color="$colorSubtitle" letterSpacing={1}>REASON FOR CHANGE</Text>
+                <Input value={reason} onChangeText={setReason} size="$4" height={80} multiline textAlignVertical="top" placeholder="Explain why these updates are needed (min 10 chars)" backgroundColor="$backgroundStrong" />
+              </YStack>
 
-              <XStack gap="$3" pt="$2">
-                <Button f={1} chromeless onPress={onClose}>Cancel</Button>
-                <Button f={1} theme="active" icon={Send} onPress={handleSubmit} disabled={loading}>{loading ? 'Submitting...' : 'Submit Request'}</Button>
-              </XStack>
+              {formError && <Text color="$red10" fontSize={13} textAlign="center">{formError}</Text>}
+
+              <Button 
+                theme="active" 
+                size="$5" 
+                fontWeight="bold"
+                icon={loading ? undefined : Send} 
+                onPress={handleSubmit} 
+                disabled={loading}
+                borderRadius="$4"
+              >
+                {loading ? 'Submitting...' : 'Submit Proposal'}
+              </Button>
             </YStack>
-          </ScrollView>
-        </Container>
-      </YStack>
-    </Modal>
+          </Sheet.ScrollView>
+        </KeyboardAvoidingView>
+      </Sheet.Frame>
+    </Sheet>
   )
 }
