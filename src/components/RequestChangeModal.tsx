@@ -66,11 +66,13 @@ export default function RequestChangeModal({
   if (!item) return null
 
   const toggleTargetMember = (memberUserId: string) => {
-    setTargetMemberIds((currentIds) =>
-      currentIds.includes(memberUserId)
-        ? currentIds.filter((id) => id !== memberUserId)
-        : [...currentIds, memberUserId]
-    )
+    setTargetMemberIds((currentIds) => {
+      if (currentIds.includes(memberUserId)) {
+        return currentIds.filter((id) => id !== memberUserId)
+      } else {
+        return [...currentIds, memberUserId]
+      }
+    })
   }
 
   const handleSubmit = async () => {
@@ -152,7 +154,7 @@ export default function RequestChangeModal({
 
   return (
     <Sheet
-      forceRemoveScrollEnabled={visible}
+      disableRemoveScroll={visible}
       modal
       open={visible}
       onOpenChange={(open) => !open && onClose()}

@@ -10,14 +10,12 @@ import { useRealtimeItems } from '../hooks/useRealtimeItems'
 import RequestChangeModal from '../components/RequestChangeModal'
 import AddItemSheet from '../components/AddItemSheet'
 import { supabase } from '../lib/supabase'
-import { Container, YStack, XStack, Text, Button, Card } from '../components/ui'
+import { Container, YStack, XStack, Text, Button, Card, Badge } from '../components/ui'
 import { 
   Plus, 
-  X,
   Check, 
   ShoppingCart, 
   Trash2, 
-  MessageSquare, 
   AlertCircle, 
   Settings, 
   Tag, 
@@ -26,7 +24,9 @@ import {
   MapPin,
   Filter,
   User,
-  LayoutGrid
+  LayoutGrid,
+  ChevronRight,
+  X
 } from '@tamagui/lucide-icons'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>
@@ -73,21 +73,32 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   useLayoutEffect(() => {
     navigation.setOptions({ 
-      title: roomName,
+      headerTitle: () => (
+        <YStack ai="center">
+          <Text fontSize={16} fontWeight="700" letterSpacing={-0.5}>{roomName}</Text>
+          <Text fontSize={11} color="$colorSubtitle" fontWeight="500">Room Details</Text>
+        </YStack>
+      ),
       headerRight: () => (
-        <XStack gap="$2" ai="center">
+        <XStack gap="$1" ai="center">
           <Button 
             size="$2" 
+            circular 
+            variant="ghost" 
             icon={AlertCircle} 
-            theme="active" 
             onPress={() => navigation.navigate('PendingRequests', { roomId })}
           >
-            {pendingRequestCount > 0 ? `(${pendingRequestCount})` : ''}
+            {pendingRequestCount > 0 && (
+              <Badge variant="destructive" position="absolute" top={-4} right={-4} width={16} height={16} padding={0}>
+                <Text fontSize={8} color="white" fontWeight="900">{pendingRequestCount}</Text>
+              </Badge>
+            )}
           </Button>
           <Button 
             size="$2" 
+            circular 
+            variant="ghost" 
             icon={Settings} 
-            chromeless
             onPress={() => navigation.navigate('RoomSettings', { roomId })}
           />
         </XStack>
@@ -175,21 +186,12 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   const handleLongPress = (item: ShoppingItem) => {
     setSelectedItem(item)
-    Alert.alert(
-      item.name,
-      'Actions',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Propose Changes', onPress: () => setIsEditModalVisible(true) },
-        { text: 'Delete Item', style: 'destructive', onPress: () => deleteItem(item.id) }
-      ]
-    )
+    setIsEditModalVisible(true)
   }
 
   const filteredAndSortedItems = useMemo(() => {
     let result = [...items]
 
-    // Filtering
     if (selectedCategoryFilter) {
       result = result.filter(item => item.category === selectedCategoryFilter)
     }
@@ -201,7 +203,6 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       )
     }
 
-    // Sorting
     if (sortByCategory) {
       result.sort((a, b) => {
         const catA = a.category || 'Z-Other'
@@ -212,7 +213,6 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
       })
     }
 
-    // Secondary sort: active first, then created_at
     result.sort((a, b) => {
       if (a.status === 'purchased' && b.status !== 'purchased') return 1
       if (a.status !== 'purchased' && b.status === 'purchased') return -1
@@ -223,107 +223,129 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
   }, [items, selectedCategoryFilter, selectedMemberFilter, sortByCategory])
 
   const renderItem = ({ item }: { item: any }) => {
-    const priorityColor = item.priority === 'high' ? '$red10' : item.priority === 'low' ? '$blue10' : '$colorSubtitle'
-    
+    const isNegotiating = item.status === 'discussion_pending'
+    const isPurchased = item.status === 'purchased'
+
     return (
       <Card 
-        elevation={item.status === 'active' ? '$2' : '$0'}
-        borderWidth={1}
-        borderColor="$borderColor"
-        backgroundColor={item.status === 'purchased' ? '$backgroundTransparent' : '$background'}
-        padding="$4" 
-        marginBottom="$2"
+        padding="$0" 
+        marginBottom="$3"
         onPress={() => toggleStatus(item)}
         onLongPress={() => handleLongPress(item)}
-        opacity={item.status === 'purchased' ? 0.6 : 1}
+        opacity={isPurchased ? 0.6 : 1}
+        elevation={isPurchased ? 0 : 2}
+        borderRadius="$3"
+        borderColor={isNegotiating ? '$yellow8' : '$borderColor'}
+        overflow="hidden"
       >
-        <XStack jc="space-between" ai="flex-start">
-          <XStack gap="$3" ai="flex-start" flex={1}>
-            <YStack 
-              width={24} 
-              height={24} 
-              borderRadius={12} 
-              borderWidth={1} 
-              borderColor={item.status === 'purchased' ? '$green10' : '$colorSubtitle'}
-              ai="center" 
-              jc="center"
-              marginTop="$1"
-              backgroundColor={item.status === 'purchased' ? '$green10' : 'transparent'}
-            >
-              {item.status === 'purchased' && <Check size={14} color="white" />}
-            </YStack>
-            
-            <YStack flex={1} gap="$1">
-              <XStack ai="center" gap="$2">
+        <XStack f={1} p="$4" ai="center" gap="$4">
+          <YStack 
+            width={24} 
+            height={24} 
+            borderRadius={12} 
+            borderWidth={1.5} 
+            borderColor={isPurchased ? '$green9' : '$borderColor'}
+            ai="center" 
+            jc="center"
+            backgroundColor={isPurchased ? '$green9' : 'transparent'}
+          >
+            {isPurchased && <Check size={14} color="white" fontWeight="bold" />}
+          </YStack>
+
+          <YStack f={1} gap="$1">
+            <XStack ai="center" jc="space-between">
+              <XStack ai="center" gap="$2" f={1}>
                 <Text 
                   fontSize={16} 
-                  fontWeight="bold"
-                  textDecorationLine={item.status === 'purchased' ? 'line-through' : 'none'}
+                  fontWeight="600"
+                  color={isPurchased ? '$colorSubtitle' : '$color'}
+                  textDecorationLine={isPurchased ? 'line-through' : 'none'}
                 >
                   {item.name}
                 </Text>
-                {(item.priority && item.priority !== 'medium') && (
-                  <Text fontSize={10} fontWeight="bold" color={priorityColor}>
-                    [{item.priority.toUpperCase()}]
-                  </Text>
+                {item.priority === 'high' && (
+                  <Badge variant="destructive">
+                    <Text fontSize={8} fontWeight="900" color="$red11">URGENT</Text>
+                  </Badge>
                 )}
               </XStack>
+              <Button 
+                size="$2" 
+                variant="ghost" 
+                circular 
+                icon={Trash2} 
+                opacity={0.3}
+                onPress={(e) => {
+                  e.stopPropagation()
+                  deleteItem(item.id)
+                }}
+              />
+            </XStack>
 
-              <XStack gap="$2" flexWrap="wrap">
-                <Text fontSize={14} color="$colorSubtitle">
-                  {item.quantity} {item.unit || ''}
-                </Text>
-                {item.category && (
-                  <XStack ai="center" gap="$1" bc="$backgroundStrong" px="$2" br="$2">
-                    <Tag size={10} color="$colorSubtitle" />
-                    <Text fontSize={11} color="$colorSubtitle">{item.category}</Text>
-                  </XStack>
-                )}
-                {item.store && (
-                  <XStack ai="center" gap="$1" bc="$backgroundStrong" px="$2" br="$2">
-                    <MapPin size={10} color="$colorSubtitle" />
-                    <Text fontSize={11} color="$colorSubtitle">{item.store}</Text>
-                  </XStack>
-                )}
-                {item.estimated_price && (
-                  <XStack ai="center" gap="$1" bc="$green2" px="$2" br="$2">
-                    <DollarSign size={10} color="$green10" />
-                    <Text fontSize={11} color="$green10">${item.estimated_price}</Text>
-                  </XStack>
-                )}
-              </XStack>
+            <XStack ai="center" gap="$2">
+              <Text fontSize={14} fontWeight="500" color={isPurchased ? '$colorSubtitle' : '$color'}>
+                {item.quantity} {item.unit || ''}
+              </Text>
+              {item.category && (
+                <Badge variant="outline">
+                  <Text fontSize={10} fontWeight="600" color="$colorSubtitle">{item.category}</Text>
+                </Badge>
+              )}
+            </XStack>
 
-              {item.notes && (
-                <XStack ai="flex-start" gap="$1">
-                  <Info size={12} color="$colorSubtitle" marginTop="$1" />
-                  <Text fontSize={12} fontStyle="italic" color="$colorSubtitle" flex={1}>
-                    {item.notes}
-                  </Text>
+            <XStack gap="$3" ai="center" flexWrap="wrap" marginTop="$1">
+              {item.store && (
+                <XStack ai="center" gap="$1">
+                  <MapPin size={10} color="$colorSubtitle" />
+                  <Text fontSize={11} color="$colorSubtitle">{item.store}</Text>
                 </XStack>
               )}
+              {item.estimated_price && (
+                <XStack ai="center" gap="$1">
+                  <DollarSign size={10} color="$green10" />
+                  <Text fontSize={11} fontWeight="700" color="$green10">{item.estimated_price}</Text>
+                </XStack>
+              )}
+            </XStack>
 
-              <YStack gap="$1" marginTop="$1">
-                {item.status === 'discussion_pending' && (
-                  <XStack ai="center" gap="$1" backgroundColor="$yellow4" paddingHorizontal="$2" borderRadius="$2" alignSelf="flex-start">
-                    <AlertCircle size={12} color="$yellow10" />
-                    <Text fontSize={10} color="$yellow10" fontWeight="bold">NEGOTIATING</Text>
-                  </XStack>
-                )}
-                <Text fontSize={10} color="$colorSubtitle">
-                  Added by {item.profiles?.name || 'Someone'}
-                </Text>
-              </YStack>
-            </YStack>
-          </XStack>
-          
-          <Button 
-            size="$2" 
-            circular 
-            icon={Trash2} 
-            chromeless 
-            theme="red" 
-            onPress={() => deleteItem(item.id)} 
-          />
+            {isNegotiating && (
+              <Badge variant="secondary" backgroundColor="$yellow2" borderColor="$yellow5" borderWidth={1} alignSelf="flex-start" marginTop="$1">
+                <XStack ai="center" gap="$1">
+                  <AlertCircle size={10} color="$yellow10" />
+                  <Text fontSize={9} color="$yellow10" fontWeight="800">PENDING CHANGES</Text>
+                </XStack>
+              </Badge>
+            )}
+
+            <XStack jc="space-between" ai="center" marginTop="$2">
+              <Text fontSize={10} color="$colorSubtitle">
+                By <Text fontWeight="700">{item.profiles?.name || 'User'}</Text>
+              </Text>
+
+              {item.target_member_ids && item.target_member_ids.length > 0 && (
+                <XStack>
+                  {item.target_member_ids.slice(0, 3).map((id: string, idx: number) => (
+                    <YStack 
+                      key={id} 
+                      width={18} 
+                      height={18} 
+                      br={9} 
+                      bc="$backgroundStrong" 
+                      ai="center" 
+                      jc="center"
+                      ml={idx > 0 ? -6 : 0}
+                      bw={1}
+                      boc="$background"
+                    >
+                      <Text fontSize={8} fontWeight="700" color="$color">
+                        {members.find(m => m.user_id === id)?.profiles?.name?.charAt(0) || '?'}
+                      </Text>
+                    </YStack>
+                  ))}
+                </XStack>
+              )}
+            </XStack>
+          </YStack>
         </XStack>
       </Card>
     )
@@ -331,46 +353,43 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
 
   return (
     <Container padding="$0">
-      <YStack bc="$backgroundStrong" p="$3" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
-        {/* Sorting & Category Filter */}
+      <YStack bc="$background" p="$3" borderBottomWidth={1} borderColor="$borderColor" gap="$3">
         <YStack gap="$2">
-          <XStack ai="center" jc="space-between">
-            <XStack ai="center" gap="$2">
-              <Filter size={16} color="$colorSubtitle" />
-              <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">FILTERS</Text>
+          <XStack ai="center" jc="space-between" px="$1">
+            <XStack ai="center" gap="$1.5">
+              <Filter size={12} color="$colorSubtitle" />
+              <Text fontSize={11} fontWeight="700" color="$colorSubtitle" letterSpacing={0.5}>FILTERS</Text>
             </XStack>
             <Button 
-              size="$2" 
-              bc={sortByCategory ? '$blue5' : 'transparent'}
+              size="$1.5" 
+              variant="ghost" 
               icon={LayoutGrid} 
               onPress={() => setSortByCategory(!sortByCategory)}
-              chromeless
+              backgroundColor={sortByCategory ? '$backgroundStrong' : 'transparent'}
             >
-              Sort by Category
+              <Text fontSize={10} fontWeight="700">Group Categories</Text>
             </Button>
           </XStack>
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <XStack gap="$1">
+            <XStack gap="$2" px="$1">
               <Button 
-                size="$2" 
-                backgroundColor={selectedCategoryFilter === null ? '$blue9' : '$background'}
-                color={selectedCategoryFilter === null ? 'white' : '$color'}
+                size="$2.5" 
+                variant={selectedCategoryFilter === null ? 'primary' : 'outline'}
                 onPress={() => setSelectedCategoryFilter(null)}
-                borderWidth={1}
-                borderColor={selectedCategoryFilter === null ? '$blue9' : '$borderColor'}
+                borderRadius="$full"
+                paddingHorizontal="$4"
               >
-                All Categories
+                All
               </Button>
               {CATEGORIES.map(cat => (
                 <Button 
                   key={cat} 
-                  size="$2" 
-                  backgroundColor={selectedCategoryFilter === cat ? '$blue9' : '$background'}
-                  color={selectedCategoryFilter === cat ? 'white' : '$color'}
+                  size="$2.5" 
+                  variant={selectedCategoryFilter === cat ? 'primary' : 'outline'}
                   onPress={() => setSelectedCategoryFilter(cat)}
-                  borderWidth={1}
-                  borderColor={selectedCategoryFilter === cat ? '$blue9' : '$borderColor'}
+                  borderRadius="$full"
+                  paddingHorizontal="$4"
                 >
                   {cat}
                 </Button>
@@ -379,33 +398,30 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
           </ScrollView>
         </YStack>
 
-        {/* Member Filter */}
         <YStack gap="$2">
-          <XStack ai="center" gap="$2">
-            <User size={16} color="$colorSubtitle" />
-            <Text fontSize={12} fontWeight="bold" color="$colorSubtitle">SHOPPING FOR</Text>
+          <XStack ai="center" gap="$1.5" px="$1">
+            <User size={12} color="$colorSubtitle" />
+            <Text fontSize={11} fontWeight="700" color="$colorSubtitle" letterSpacing={0.5}>SHOPPING FOR</Text>
           </XStack>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <XStack gap="$1">
+            <XStack gap="$2" px="$1">
               <Button 
-                size="$2" 
-                backgroundColor={selectedMemberFilter === null ? '$blue9' : '$background'}
-                color={selectedMemberFilter === null ? 'white' : '$color'}
+                size="$2.5" 
+                variant={selectedMemberFilter === null ? 'primary' : 'outline'}
                 onPress={() => setSelectedMemberFilter(null)}
-                borderWidth={1}
-                borderColor={selectedMemberFilter === null ? '$blue9' : '$borderColor'}
+                borderRadius="$full"
+                paddingHorizontal="$4"
               >
                 Everyone
               </Button>
               {members.map(m => (
                 <Button 
                   key={m.user_id} 
-                  size="$2" 
-                  backgroundColor={selectedMemberFilter === m.user_id ? '$blue9' : '$background'}
-                  color={selectedMemberFilter === m.user_id ? 'white' : '$color'}
+                  size="$2.5" 
+                  variant={selectedMemberFilter === m.user_id ? 'primary' : 'outline'}
                   onPress={() => setSelectedMemberFilter(m.user_id)}
-                  borderWidth={1}
-                  borderColor={selectedMemberFilter === m.user_id ? '$blue9' : '$borderColor'}
+                  borderRadius="$full"
+                  paddingHorizontal="$4"
                 >
                   {m.profiles?.name?.split(' ')[0]}
                 </Button>
@@ -424,24 +440,23 @@ export default function RoomDetailsScreen({ route, navigation }: Props) {
         onRefresh={onRefresh}
         ListEmptyComponent={
           <YStack ai="center" jc="center" padding="$10" gap="$4">
-            <ShoppingCart size={48} color="$colorSubtitle" opacity={0.5} />
-            <Text textAlign="center" color="$colorSubtitle">
-              No items found.
+            <ShoppingCart size={40} color="$borderColor" />
+            <Text textAlign="center" color="$colorSubtitle" fontSize={14} fontWeight="500">
+              No items in this room yet.
             </Text>
           </YStack>
         }
       />
 
-      {/* Floating Action Button */}
       <Button
         position="absolute"
-        bottom={30}
-        right={30}
-        size="$6"
+        bottom={32}
+        right={24}
+        size="$5"
         circular
-        theme={isAddSheetVisible ? 'red' : 'active'}
+        variant="primary"
         icon={isAddSheetVisible ? X : Plus}
-        elevation="$4"
+        elevation={4}
         onPress={() => setIsAddSheetVisible(!isAddSheetVisible)}
         zIndex={2000}
       />

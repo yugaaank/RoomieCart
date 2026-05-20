@@ -34,11 +34,13 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
   const [error, setError] = useState<string | null>(null)
 
   const toggleTargetMember = (memberUserId: string) => {
-    setTargetMemberIds((currentIds) =>
-      currentIds.includes(memberUserId)
-        ? currentIds.filter((id) => id !== memberUserId)
-        : [...currentIds, memberUserId]
-    )
+    setTargetMemberIds((currentIds) => {
+      if (currentIds.includes(memberUserId)) {
+        return currentIds.filter((id) => id !== memberUserId)
+      } else {
+        return [...currentIds, memberUserId]
+      }
+    })
   }
 
   const handleAdd = async () => {
@@ -59,11 +61,13 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
     setError(null)
 
     try {
+      // If targetMemberIds is empty, it's for everyone. 
+      // We pass an empty array to the service which handles it.
       await onAdd({
         name: sanitizedName,
         quantity: sanitizedQuantity,
         unit,
-        targetMemberIds,
+        targetMemberIds: targetMemberIds,
         category: category || undefined,
         priority,
         notes: notes.trim() || undefined,
@@ -91,7 +95,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, members }: Props
 
   return (
     <Sheet
-      forceRemoveScrollEnabled={visible}
+      disableRemoveScroll={visible}
       modal
       open={visible}
       onOpenChange={(open) => !open && onClose()}
